@@ -65,7 +65,7 @@ specio init payment-specs --type frontend # short name works when it is unique; 
 specio pull                               # downloads every specs document into ./specs
 # ... edit files under specs/ ...
 specio status                             # unchanged / local-only / remote-only / conflict / deleted
-specio diff epic-payment/prd.md           # against the latest remote (add --base to compare offline)
+specio diff epics/epic-payment/prd.md           # against the latest remote (add --base to compare offline)
 specio push                               # one batch through the API
 specio context epic-payment/create-payment   # files a coding agent should read, one per line
 ```
@@ -146,13 +146,15 @@ specs/                   the working copy (ignored by Git)
 | `pull` reports conflicts | `specio diff <path>`, edit the file to the result you want, then `specio pull` again |
 | `push` is refused: "workspace is not clean" | a previous pull left conflicts or never completed: `specio status`, resolve, `specio pull` |
 | `push` rejected with `head_changed` / `document_changed` (exit 5) | someone changed the specs first; nothing was committed: `specio pull`, re-check, push again |
-| `push` rejected with `policy_denied` (exit 6) | your role may not write that path; ask a Project Admin. `list` refreshes after the denial |
+| `push` rejected with `policy_denied` (exit 6) | your role may not write that path; ask a platform admin. `list` refreshes after the denial |
 | "the remote kept changing while pulling" | the repository moved during all 3 attempts; nothing changed locally, retry |
 | `429`/rate-limited (exit 4) | reads are retried automatically a few times; wait a minute and retry |
 | `another specio command is already running in this workspace` | wait for it to finish; it is a per-workspace lock |
 | `upgrade` says it was "not installed by the official installer" | reinstall with the installer, or use your package manager |
 
 ## Development
+
+Untuk menjalankan CLI melawan API dan Web lokal, lihat [local-development.md](../local-development.md) (`export SPECIO_API_URL=http://localhost:8787`).
 
 ```bash
 cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings

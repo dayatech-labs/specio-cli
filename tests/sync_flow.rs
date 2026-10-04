@@ -5,9 +5,9 @@ use specio::error::{Error, exit};
 use specio::sync::{push, status};
 use support::{Fixture, PROJECT};
 
-const PRD: &str = "epic-payment/prd.md";
-const README: &str = "epic-payment/features/create-payment/README.md";
-const NEW_DOC: &str = "epic-payment/features/create-payment/frontend.md";
+const PRD: &str = "epics/epic-payment/prd.md";
+const README: &str = "epics/epic-payment/features/create-payment/README.md";
+const NEW_DOC: &str = "epics/epic-payment/features/create-payment/frontend.md";
 
 #[tokio::test]
 async fn first_pull_downloads_everything_and_advances_the_lock() {
@@ -37,24 +37,25 @@ async fn pull_applies_remote_changes_but_keeps_local_only_edits() {
     f.write(README, "# mine\n"); // local-only edit
     f.api.external_change(PRD, Some("# PRD v2\n"));
     f.api.external_change(
-        "epic-payment/features/create-payment/cli.md",
+        "epics/epic-payment/features/create-payment/DESIGN.md",
         Some("# New\n"),
     );
-    f.api.external_change("epic-payment/architecture.md", None);
+    f.api
+        .external_change("epics/epic-payment/architecture.md", None);
 
     let report = f.pull().await.unwrap();
     assert_eq!(report.updated, vec![PRD.to_string()]);
     assert_eq!(
         report.added,
-        vec!["epic-payment/features/create-payment/cli.md".to_string()]
+        vec!["epics/epic-payment/features/create-payment/DESIGN.md".to_string()]
     );
     assert_eq!(
         report.deleted,
-        vec!["epic-payment/architecture.md".to_string()]
+        vec!["epics/epic-payment/architecture.md".to_string()]
     );
     assert_eq!(f.read(README).as_deref(), Some("# mine\n"));
     assert_eq!(f.read(PRD).as_deref(), Some("# PRD v2\n"));
-    assert!(f.read("epic-payment/architecture.md").is_none());
+    assert!(f.read("epics/epic-payment/architecture.md").is_none());
     assert!(report.lock_advanced);
 }
 
@@ -66,8 +67,9 @@ async fn conflicts_are_never_overwritten_and_block_push() {
 
     f.write(PRD, "# local PRD\n"); // both changed
     f.api.external_change(PRD, Some("# remote PRD\n"));
-    f.write("epic-payment/product-brief.md", "# local brief\n"); // remote delete over local edit
-    f.api.external_change("epic-payment/product-brief.md", None);
+    f.write("epics/epic-payment/product-brief.md", "# local brief\n"); // remote delete over local edit
+    f.api
+        .external_change("epics/epic-payment/product-brief.md", None);
     f.write(NEW_DOC, "# my frontend doc\n"); // remote add over untracked local file
     f.api
         .external_change(NEW_DOC, Some("# remote frontend doc\n"));
@@ -78,15 +80,15 @@ async fn conflicts_are_never_overwritten_and_block_push() {
     assert_eq!(
         conflicted,
         vec![
-            "epic-payment/features/create-payment/frontend.md",
+            "epics/epic-payment/features/create-payment/frontend.md",
             PRD,
-            "epic-payment/product-brief.md"
+            "epics/epic-payment/product-brief.md"
         ]
     );
     assert!(!report.lock_advanced);
     assert_eq!(f.read(PRD).as_deref(), Some("# local PRD\n"));
     assert_eq!(
-        f.read("epic-payment/product-brief.md").as_deref(),
+        f.read("epics/epic-payment/product-brief.md").as_deref(),
         Some("# local brief\n")
     );
     assert_eq!(f.read(NEW_DOC).as_deref(), Some("# my frontend doc\n"));
@@ -168,7 +170,7 @@ async fn symlinks_are_never_followed_or_sent() {
     std::fs::write(outside.path().join("secret.md"), "secret").unwrap();
     std::os::unix::fs::symlink(
         outside.path().join("secret.md"),
-        f.path("epic-payment/features/create-payment/cli.md"),
+        f.path("epics/epic-payment/features/create-payment/DESIGN.md"),
     )
     .unwrap();
 
@@ -176,9 +178,9 @@ async fn symlinks_are_never_followed_or_sent() {
     assert!(f.pull().await.is_err());
     assert_eq!(f.api.count("POST /v1/projects/proj_payment/changes"), 0);
     // A symlinked parent directory is refused as a write target too.
-    std::fs::remove_file(f.path("epic-payment/features/create-payment/cli.md")).unwrap();
-    std::fs::remove_dir_all(f.path("epic-payment")).unwrap();
-    std::os::unix::fs::symlink(outside.path(), f.path("epic-payment")).unwrap();
+    std::fs::remove_file(f.path("epics/epic-payment/features/create-payment/DESIGN.md")).unwrap();
+    std::fs::remove_dir_all(f.path("epics/epic-payment")).unwrap();
+    std::os::unix::fs::symlink(outside.path(), f.path("epics/epic-payment")).unwrap();
     f.api.external_change(PRD, Some("# changed\n"));
     assert!(f.pull().await.is_err());
     assert!(!outside.path().join("prd.md").exists());
@@ -191,7 +193,7 @@ async fn status_reports_each_category_and_diff_works_with_and_without_network() 
     f.write(README, "# mine\n"); // local-only
     std::fs::remove_file(f.path("llms.txt")).unwrap(); // deleted
     f.api
-        .external_change("epic-payment/architecture.md", Some("# arch v2\n")); // remote-only
+        .external_change("epics/epic-payment/architecture.md", Some("# arch v2\n")); // remote-only
     f.write(PRD, "# local\n");
     f.api.external_change(PRD, Some("# remote\n")); // conflict
 
@@ -199,9 +201,9 @@ async fn status_reports_each_category_and_diff_works_with_and_without_network() 
     let state = |p: &str| report.files.iter().find(|x| x.path == p).unwrap().state;
     assert_eq!(state(README), "local-only");
     assert_eq!(state("llms.txt"), "deleted");
-    assert_eq!(state("epic-payment/architecture.md"), "remote-only");
+    assert_eq!(state("epics/epic-payment/architecture.md"), "remote-only");
     assert_eq!(state(PRD), "conflict");
-    assert_eq!(state("epic-payment/product-brief.md"), "unchanged");
+    assert_eq!(state("epics/epic-payment/product-brief.md"), "unchanged");
     assert!(!report.up_to_date);
     assert_eq!(report.exit_code_for_test(), exit::CONFLICT);
 
@@ -266,7 +268,7 @@ async fn push_sends_one_batch_and_moves_baseline_and_lock() {
     f.pull().await.unwrap();
     f.write(README, "# readme edited\n"); // update
     f.write(NEW_DOC, "# frontend\n"); // create
-    std::fs::remove_file(f.path("epic-payment/features/create-payment/backend.md")).unwrap(); // delete
+    std::fs::remove_file(f.path("epics/epic-payment/features/create-payment/backend.md")).unwrap(); // delete
 
     let before_commits = f.api.commits();
     let report = push::push(&f.device.env, &f.ws()).await.unwrap();
@@ -276,7 +278,7 @@ async fn push_sends_one_batch_and_moves_baseline_and_lock() {
     assert_eq!(f.api.file(NEW_DOC).as_deref(), Some("# frontend\n"));
     assert!(
         f.api
-            .file("epic-payment/features/create-payment/backend.md")
+            .file("epics/epic-payment/features/create-payment/backend.md")
             .is_none()
     );
 
@@ -358,7 +360,10 @@ async fn push_rejects_unsendable_content_before_any_request() {
     f.write(README, &"x".repeat(1024 * 1024 + 1));
     assert!(push::push(&f.device.env, &f.ws()).await.is_err());
     f.write(README, "# ok\n");
-    f.write("epic-payment/notes.md", "ignored: not a canonical path\n");
+    f.write(
+        "epics/epic-payment/notes.md",
+        "ignored: not a canonical path\n",
+    );
     let report = push::push(&f.device.env, &f.ws()).await.unwrap();
     assert_eq!(
         report.changes.len(),
@@ -372,11 +377,11 @@ async fn push_rejects_unsendable_content_before_any_request() {
 async fn context_is_deterministic_offline_and_ordered() {
     let f = Fixture::new().await;
     f.api.external_change(
-        "epic-payment/features/create-payment/DESIGN.md",
+        "epics/epic-payment/features/create-payment/DESIGN.md",
         Some("# Design\n"),
     );
     f.api.external_change(
-        "epic-payment/features/create-payment/acceptance-criteria.md",
+        "epics/epic-payment/features/create-payment/acceptance-criteria.md",
         Some("# AC\n"),
     );
     f.pull().await.unwrap();
@@ -388,13 +393,13 @@ async fn context_is_deterministic_offline_and_ordered() {
         report.paths,
         vec![
             "specs/llms.txt",
-            "specs/epic-payment/product-brief.md",
-            "specs/epic-payment/prd.md",
-            "specs/epic-payment/architecture.md",
-            "specs/epic-payment/features/create-payment/README.md",
-            "specs/epic-payment/features/create-payment/acceptance-criteria.md",
-            "specs/epic-payment/features/create-payment/DESIGN.md",
-            "specs/epic-payment/features/create-payment/backend.md",
+            "specs/epics/epic-payment/product-brief.md",
+            "specs/epics/epic-payment/prd.md",
+            "specs/epics/epic-payment/architecture.md",
+            "specs/epics/epic-payment/features/create-payment/README.md",
+            "specs/epics/epic-payment/features/create-payment/acceptance-criteria.md",
+            "specs/epics/epic-payment/features/create-payment/DESIGN.md",
+            "specs/epics/epic-payment/features/create-payment/backend.md",
         ]
     );
     assert_eq!(report.head_sha, f.api.head());

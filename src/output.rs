@@ -70,7 +70,7 @@ impl Human for LogoutReport {
 impl Human for ListReport {
     fn human(&self) -> String {
         if self.projects.is_empty() {
-            return "No repositories are available to you yet. Ask a Project Admin to add you."
+            return "No repositories are available to you yet. Ask a platform admin to add you."
                 .into();
         }
         let width = self

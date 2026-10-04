@@ -6,14 +6,29 @@ const MAX_PATH_LENGTH: usize = 300;
 const MAX_SEGMENTS: usize = 8;
 const ASSET_EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "gif", "webp"];
 const EPIC_FILES: [&str; 3] = ["product-brief.md", "prd.md", "architecture.md"];
-pub const FEATURE_FILES: [&str; 6] = [
+pub const FEATURE_FILES: [&str; 5] = [
     "README.md",
     "acceptance-criteria.md",
     "DESIGN.md",
     "frontend.md",
     "backend.md",
-    "cli.md",
 ];
+
+/// `^dr-[0-9]{2,}-[a-z0-9][a-z0-9-]{0,80}\.md$`
+fn is_decision_file(s: &str) -> bool {
+    let Some(rest) = s.strip_prefix("dr-").and_then(|r| r.strip_suffix(".md")) else {
+        return false;
+    };
+    let digits = rest.chars().take_while(char::is_ascii_digit).count();
+    let Some(name) = rest[digits..].strip_prefix('-') else {
+        return false;
+    };
+    let mut chars = name.chars();
+    digits >= 2
+        && matches!(chars.next(), Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit())
+        && name.len() <= 81
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
 
 /// `^[a-z0-9][a-z0-9_-]{0,63}$`
 pub fn is_folder_name(s: &str) -> bool {
@@ -31,7 +46,7 @@ fn is_file_segment(s: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
 }
 
-/// True for the Markdown documents the API manages (`llms.txt` included). Assets are not synced.
+/// True for the Markdown documents the API manages (root `llms.txt` and `README.md` included). Assets are not synced.
 pub fn is_canonical_markdown(path: &str) -> bool {
     if path.is_empty()
         || path.len() > MAX_PATH_LENGTH
@@ -56,7 +71,7 @@ pub fn is_canonical_markdown(path: &str) -> bool {
     if ASSET_EXTENSIONS.contains(&extension) {
         return false;
     }
-    if path == "llms.txt" {
+    if path == "llms.txt" || path == "README.md" {
         return true;
     }
     let first = segments[0];
@@ -66,14 +81,16 @@ pub fn is_canonical_markdown(path: &str) -> bool {
             && file.ends_with(".md")
             && segments.iter().all(|s| is_file_segment(s));
     }
-    if !is_folder_name(first) {
+    // Epics live under `epics/<epic>/`; an epic folder at the repository root is not canonical.
+    if first != "epics" || segments.len() < 3 || !is_folder_name(segments[1]) {
         return false;
     }
     match segments.len() {
-        2 => EPIC_FILES.contains(&file),
-        4 => {
-            segments[1] == "features"
-                && is_folder_name(segments[2])
+        3 => EPIC_FILES.contains(&file),
+        4 => segments[2] == "decisions" && is_decision_file(file),
+        5 => {
+            segments[2] == "features"
+                && is_folder_name(segments[3])
                 && FEATURE_FILES.contains(&file)
         }
         _ => false,
@@ -109,13 +126,15 @@ mod tests {
     fn accepts_canonical_documents() {
         for ok in [
             "llms.txt",
+            "README.md",
             "design/tokens.md",
             "design/components/button.md",
-            "epic-payment/prd.md",
-            "epic-payment/product-brief.md",
-            "epic-payment/architecture.md",
-            "epic-payment/features/create-payment/README.md",
-            "epic-payment/features/create-payment/cli.md",
+            "epics/epic-payment/prd.md",
+            "epics/epic-payment/product-brief.md",
+            "epics/epic-payment/architecture.md",
+            "epics/epic-payment/decisions/dr-01-use-postgres.md",
+            "epics/epic-payment/features/create-payment/README.md",
+            "epics/epic-payment/features/create-payment/backend.md",
         ] {
             assert!(is_canonical_markdown(ok), "{ok}");
         }
@@ -127,18 +146,25 @@ mod tests {
             "",
             "/etc/passwd",
             "../x.md",
-            "epic/../prd.md",
-            "epic-payment/prd.md/",
-            "Epic/prd.md",
-            "epic-payment/notes.md",
-            "epic-payment/features/x/notes.md",
-            "epic-payment/features/x/y/README.md",
+            "epics/epic/../prd.md",
+            "epics/epic-payment/prd.md/",
+            "epics/Epic/prd.md",
+            "epics/epic-payment/notes.md",
+            "epics/epic-payment/features/x/notes.md",
+            "epics/epic-payment/features/x/cli.md",
+            "epics/epic-payment/features/x/y/README.md",
+            "epics/epic-payment/decisions/use-postgres.md",
+            "epics/epic-payment/decisions/dr-1-x.md",
+            "epics/epic-payment/decisions/old/dr-01-x.md",
+            "epics/prd.md",
+            "epic-payment/prd.md",
+            "epic-payment/features/x/README.md",
             ".hidden/prd.md",
-            "epic-payment/.prd.md",
-            "epic payment/prd.md",
-            "epic-payment/prd%2e.md",
-            "epic-payment\\prd.md",
-            "epic-payment/images/flow.png",
+            "epics/epic-payment/.prd.md",
+            "epics/epic payment/prd.md",
+            "epics/epic-payment/prd%2e.md",
+            "epics/epic-payment\\prd.md",
+            "epics/epic-payment/images/flow.png",
             "design/",
             "design/.md",
             "readme.md",

@@ -71,18 +71,24 @@ impl State {
     fn new() -> State {
         let mut files = BTreeMap::new();
         files.insert("llms.txt".into(), "# llms\n".into());
-        files.insert("epic-payment/prd.md".into(), "# PRD\n\nPayments.\n".into());
-        files.insert("epic-payment/product-brief.md".into(), "# Brief\n".into());
         files.insert(
-            "epic-payment/architecture.md".into(),
+            "epics/epic-payment/prd.md".into(),
+            "# PRD\n\nPayments.\n".into(),
+        );
+        files.insert(
+            "epics/epic-payment/product-brief.md".into(),
+            "# Brief\n".into(),
+        );
+        files.insert(
+            "epics/epic-payment/architecture.md".into(),
             "# Architecture\n".into(),
         );
         files.insert(
-            "epic-payment/features/create-payment/README.md".into(),
+            "epics/epic-payment/features/create-payment/README.md".into(),
             "# Create payment\n".into(),
         );
         files.insert(
-            "epic-payment/features/create-payment/backend.md".into(),
+            "epics/epic-payment/features/create-payment/backend.md".into(),
             "# Backend\n".into(),
         );
         let mut projects = BTreeMap::new();
@@ -332,7 +338,7 @@ fn handle(
             .filter_map(|id| st.projects.get(id).map(|p| (id, p)))
             .map(|(id, p)| {
                 json!({ "project_id": id, "display_name": id, "repository_full_name": p.repo, "branch": "main", "roles": ["engineer"],
-                    "capabilities": { "create": { "allow": ["*/features/*/*.md"], "deny": [] }, "update": { "allow": ["*/features/*/*.md"], "deny": [] }, "can_delete": false, "can_restore": false, "can_manage": false } })
+                    "capabilities": { "create": { "allow": ["epics/*/features/*/*.md"], "deny": [] }, "update": { "allow": ["epics/*/features/*/*.md"], "deny": [] }, "can_delete": false, "can_restore": false, "can_manage": false } })
             })
             .collect();
         let body = json!({ "user_id": user, "authorization_version": st.auth_version.get(&user).copied().unwrap_or(1), "issued_at": iso(0), "expires_at": iso(st.snapshot_ttl), "projects": projects });

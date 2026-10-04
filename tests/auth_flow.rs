@@ -214,9 +214,15 @@ async fn a_new_window_longer_than_fifteen_minutes_is_clamped() {
 async fn role_change_refreshes_the_snapshot_after_a_403() {
     let f = support::Fixture::new().await;
     f.api.with(|s| s.forbid_writes = true);
-    f.write("epic-payment/features/create-payment/cli.md", "# CLI\n");
+    f.write(
+        "epics/epic-payment/features/create-payment/DESIGN.md",
+        "# CLI\n",
+    );
     f.pull().await.unwrap();
-    f.write("epic-payment/features/create-payment/cli.md", "# CLI\n");
+    f.write(
+        "epics/epic-payment/features/create-payment/DESIGN.md",
+        "# CLI\n",
+    );
     let before = f.api.count("GET /v1/projects");
     let err = specio::sync::push::push(&f.device.env, &f.ws())
         .await

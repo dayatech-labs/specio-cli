@@ -1,4 +1,5 @@
-//! `specio context <epic>/<feature>`: a deterministic list of paths from the local working copy.
+//! `specio context <epic>/<feature>`: a deterministic list of paths from the local working copy
+//! (the epic lives under `epics/<epic>/` in the repository).
 use crate::error::{Error, Result};
 use crate::paths::FEATURE_FILES;
 use crate::workspace::{Workspace, ensure_valid_epic_feature};
@@ -25,15 +26,15 @@ pub fn context(ws: &Workspace, target: &str) -> Result<ContextReport> {
     let lock = ws.load_lock()?;
     let head_sha = lock.head_sha.clone().filter(|_| lock.pending.is_empty()).ok_or_else(|| Error::conflict("the workspace is not clean; run `specio pull` and resolve conflicts before generating context"))?;
 
-    let mut candidates = vec!["llms.txt".to_string()];
+    let mut candidates = vec!["llms.txt".to_string(), "README.md".to_string()];
     candidates.extend(
         ["product-brief.md", "prd.md", "architecture.md"]
             .iter()
-            .map(|f| format!("{epic}/{f}")),
+            .map(|f| format!("epics/{epic}/{f}")),
     );
     let feature_paths: Vec<String> = FEATURE_FILES
         .iter()
-        .map(|f| format!("{epic}/features/{feature}/{f}"))
+        .map(|f| format!("epics/{epic}/features/{feature}/{f}"))
         .collect();
 
     let exists = |p: &str| ws.local_path(p).is_file() && ws.check_target(p).is_ok();

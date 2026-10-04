@@ -85,13 +85,13 @@ pub enum Command {
 
     /// Show a diff of a file against the latest remote (or the last sync with --base)
     #[command(
-        after_help = "Arguments:\n  <PATH>  document path relative to the specs folder, as printed by `specio status`\n\nExamples:\n  specio diff epic-payment/prd.md\n  specio diff epic-payment/prd.md --base\n\n--base works offline.\n\n"
+        after_help = "Arguments:\n  <PATH>  document path relative to the specs folder, as printed by `specio status`\n\nExamples:\n  specio diff epics/epic-payment/prd.md\n  specio diff epics/epic-payment/prd.md --base\n\n--base works offline.\n\n"
     )]
     Diff(DiffArgs),
 
     /// Apply the latest remote version of one file if it has no local changes
     #[command(
-        after_help = "Arguments:\n  <PATH>  document path relative to the specs folder\n\nExamples:\n  specio update epic-payment/prd.md\n\nFails when the local copy changed; there is no force or discard option.\n\n"
+        after_help = "Arguments:\n  <PATH>  document path relative to the specs folder\n\nExamples:\n  specio update epics/epic-payment/prd.md\n\nFails when the local copy changed; there is no force or discard option.\n\n"
     )]
     Update(UpdateArgs),
 
