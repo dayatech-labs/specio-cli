@@ -1,0 +1,20 @@
+//! Specio CLI library: everything the `specio` binary does, testable without a terminal.
+pub mod agent;
+pub mod api;
+pub mod cli;
+pub mod commands;
+pub mod context;
+pub mod credentials;
+pub mod dirs;
+pub mod env;
+pub mod error;
+pub mod fsx;
+pub mod hashing;
+pub mod init;
+pub mod output;
+pub mod paths;
+pub mod session;
+pub mod snapshot;
+pub mod sync;
+pub mod upgrade;
+pub mod workspace;
