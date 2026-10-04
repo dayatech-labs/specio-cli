@@ -1,4 +1,4 @@
-//! Device session: login (PKCE), rotating refresh credential, in-memory access token,
+//! Device session: login (PKCE), a stored access token that simply expires (there is no refresh),
 //! capability snapshot refresh, logout, and the background-agent tick.
 use crate::api::{ProjectsResponse, Tokens};
 use crate::credentials::StoredCredential;
@@ -21,7 +21,7 @@ const MAX_POLL_FAILURES: u32 = 3;
 const AGENT_REFRESH_AHEAD: TimeDuration = TimeDuration::seconds(150);
 const AGENT_JITTER_MAX_SECONDS: u64 = 10;
 
-/// An access token valid for ~15 minutes. It exists only in memory.
+/// The access token of a session that has not expired locally. The server still decides on every request.
 pub struct Authed {
     pub token: SecretString,
 }
@@ -46,6 +46,8 @@ pub struct LoginReport {
 #[derive(Debug, Serialize)]
 pub struct LogoutReport {
     pub was_logged_in: bool,
+    /// Every other session of the account was ended too (`logout --all`).
+    pub all_devices: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -217,20 +219,20 @@ impl<'a> Session<'a> {
         let env = self.env;
         let _lock = FileLock::exclusive(&env.auth_lock_path())?;
 
-        // Replace any earlier session on this device: revoke it (best effort) and drop its cache,
-        // so an account switch cannot leave the previous user's snapshot behind.
-        let previous = env.creds.load(&env.account()).ok().flatten();
-        if let Some(previous) = previous {
-            let _ = env.client.logout(&previous.refresh_credential).await;
-        }
+        let expires_at = snapshot::parse_time(&tokens.access_token_expires_at)
+            .ok_or_else(|| Error::Other("the API returned an invalid token expiry".into()))?;
+
+        // Replace any earlier session on this device and drop its cache, so an account switch cannot
+        // leave the previous user's snapshot behind. The old token cannot be revoked individually; it
+        // just stops being used here.
         snapshot::delete(&env.snapshot_path())?;
 
-        // Store the credential before anything else can fail so the new device session is never orphaned.
         env.creds.save(
             &env.account(),
             &StoredCredential {
                 user_id: None,
-                refresh_credential: tokens.refresh_credential,
+                access_token: tokens.access_token.clone(),
+                expires_at,
             },
         )?;
         let token = SecretString::from(tokens.access_token);
@@ -271,34 +273,39 @@ impl<'a> Session<'a> {
 
     // --------------------------------------------------------------- logout
 
-    /// Revokes this device on the server, then clears local state either way.
-    pub async fn logout(&self) -> Result<LogoutReport> {
+    /// Clears local state. With `everywhere` it first asks the server to end every token of the account:
+    /// tokens are stateless, so a plain logout cannot revoke this one.
+    pub async fn logout(&self, everywhere: bool) -> Result<LogoutReport> {
         let _lock = FileLock::exclusive(&self.env.auth_lock_path())?;
         let credential = self.env.creds.load(&self.env.account()).ok().flatten();
-        let revoke = match &credential {
-            Some(c) => self.env.client.logout(&c.refresh_credential).await,
-            None => Ok(()),
+        let revoke = match (&credential, everywhere) {
+            (Some(c), true) => {
+                self.env
+                    .client
+                    .logout_everywhere(&SecretString::from(c.access_token.clone()))
+                    .await
+            }
+            _ => Ok(()),
         };
         self.clear_local()?;
+        let report = LogoutReport {
+            was_logged_in: credential.is_some(),
+            all_devices: everywhere && credential.is_some(),
+        };
         match revoke {
-            Ok(()) => Ok(LogoutReport {
-                was_logged_in: credential.is_some(),
-            }),
-            // The credential was already invalid server-side: nothing is left to revoke.
-            Err(Error::Api(e)) if e.status == 401 => Ok(LogoutReport {
-                was_logged_in: credential.is_some(),
-            }),
+            Ok(()) => Ok(report),
+            // The token was already rejected server-side: nothing is left to end.
+            Err(Error::SessionExpired) => Ok(report),
             Err(e) => Err(Error::Network(format!(
-                "signed out on this machine, but the device could not be revoked on the server ({e}); revoke it from an admin account if needed"
+                "signed out on this machine, but the other sessions could not be ended ({e}); log in and run `specio logout --all` to retry"
             ))),
         }
     }
 
     // ----------------------------------------------------------- credentials
 
-    /// Rotate the refresh credential into a fresh access token. Cross-process safe: the rotation
-    /// and the write of the new credential happen under one lock, so two processes never present
-    /// the same credential. A `401` removes all local authentication state.
+    /// The stored token if it has not expired. An expired or rejected token removes all local
+    /// authentication state: there is no refresh, so the user signs in again.
     pub async fn authenticate(&self) -> Result<Authed> {
         self.authenticate_with(TimeDuration::ZERO).await
     }
@@ -308,29 +315,20 @@ impl<'a> Session<'a> {
         let _lock = FileLock::exclusive(&env.auth_lock_path())?;
         let credential = self.credential()?;
 
-        let tokens = match env.client.refresh(&credential.refresh_credential).await {
-            Ok(tokens) => tokens,
-            Err(Error::Api(e)) if e.status == 401 => {
+        if credential.is_expired(now()) {
+            self.clear_local()?;
+            return Err(Error::SessionExpired);
+        }
+        let token = SecretString::from(credential.access_token.clone());
+
+        let snapshot = match self.refresh_snapshot(&token, false, snapshot_margin).await {
+            Ok(snapshot) => snapshot,
+            Err(Error::SessionExpired) => {
                 self.clear_local()?;
                 return Err(Error::SessionExpired);
             }
             Err(e) => return Err(e),
         };
-        let rotated = StoredCredential {
-            user_id: credential.user_id.clone(),
-            refresh_credential: tokens.refresh_credential,
-        };
-        if let Err(first) = env.creds.save(&env.account(), &rotated) {
-            // The server already rotated: retry once, because losing the new credential forces a new login.
-            env.creds
-                .save(&env.account(), &rotated)
-                .map_err(|_| first)?;
-        }
-        let token = SecretString::from(tokens.access_token);
-
-        let snapshot = self
-            .refresh_snapshot(&token, false, snapshot_margin)
-            .await?;
         if credential
             .user_id
             .as_deref()

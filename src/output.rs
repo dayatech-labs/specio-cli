@@ -57,8 +57,10 @@ impl Human for LoginReport {
 
 impl Human for LogoutReport {
     fn human(&self) -> String {
-        if self.was_logged_in {
-            "Logged out. The device was revoked and local credentials were removed.".into()
+        if self.was_logged_in && self.all_devices {
+            "Logged out everywhere. Every session of this account was ended and local credentials were removed.".into()
+        } else if self.was_logged_in {
+            "Logged out. Local credentials were removed; the token itself stays valid until it expires (use `specio logout --all` to end it).".into()
         } else {
             "You were not logged in; local state was cleaned.".into()
         }

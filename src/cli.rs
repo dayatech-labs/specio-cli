@@ -49,15 +49,15 @@ pub struct Cli {
 pub enum Command {
     /// Log in to Specio in your browser
     #[command(
-        after_help = "Examples:\n  specio login\n  specio login --no-browser\n\nThe refresh credential is kept in the OS credential store; the access token lives in memory only.\n\n"
+        after_help = "Examples:\n  specio login\n  specio login --no-browser\n\nThe access token is kept in the OS credential store and expires after 30 days. There is no refresh: when it\nexpires, commands fail with exit code 3 and you run `specio login` again.\n\n"
     )]
     Login(LoginArgs),
 
-    /// Revoke this device and delete local credentials and cache
+    /// Delete the local credential and cache (--all also ends every other device)
     #[command(
-        after_help = "Examples:\n  specio logout\n\nWorkspace files and `.specio/` are left untouched.\n\n"
+        after_help = "Examples:\n  specio logout\n  specio logout --all\n\nA token cannot be revoked on its own. Plain `logout` forgets it on this machine only; --all ends every token\nyour account holds, on every device and in the Web app. Workspace files and `.specio/` are left untouched.\n\n"
     )]
-    Logout,
+    Logout(LogoutArgs),
 
     /// List the specs repositories you are allowed to use
     #[command(
@@ -122,7 +122,7 @@ impl Command {
     pub fn name(&self) -> &'static str {
         match self {
             Command::Login(_) => "login",
-            Command::Logout => "logout",
+            Command::Logout(_) => "logout",
             Command::List => "list",
             Command::Init(_) => "init",
             Command::Pull => "pull",
@@ -142,6 +142,13 @@ pub struct LoginArgs {
     /// Print the approval URL without opening a browser
     #[arg(long)]
     pub no_browser: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct LogoutArgs {
+    /// Also end every other session of this account (all devices and the Web app)
+    #[arg(long)]
+    pub all: bool,
 }
 
 #[derive(Args, Debug)]

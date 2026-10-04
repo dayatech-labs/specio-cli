@@ -1,25 +1,36 @@
-//! The Specio refresh credential lives only in the secure OS credential store.
+//! The Specio access token lives only in the secure OS credential store.
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Mutex;
+use time::OffsetDateTime;
 
 const SERVICE: &str = "specio-cli";
 
-/// What is stored per API origin. Never contains the access token or Google/GitHub credentials.
+/// What is stored per API origin. Never contains Google/GitHub credentials.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StoredCredential {
     /// Known once the first capability snapshot has been read.
     pub user_id: Option<String>,
-    pub refresh_credential: String,
+    pub access_token: String,
+    /// Signed into the token by the API. There is no refresh: this is the end of the session.
+    #[serde(with = "time::serde::rfc3339")]
+    pub expires_at: OffsetDateTime,
+}
+
+impl StoredCredential {
+    pub fn is_expired(&self, now: OffsetDateTime) -> bool {
+        self.expires_at <= now
+    }
 }
 
 impl fmt::Debug for StoredCredential {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StoredCredential")
             .field("user_id", &self.user_id)
-            .field("refresh_credential", &"[redacted]")
+            .field("access_token", &"[redacted]")
+            .field("expires_at", &self.expires_at)
             .finish()
     }
 }

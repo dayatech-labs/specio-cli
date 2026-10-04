@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use support::{Device, FakeApi, REPO};
 
 #[tokio::test]
-async fn login_stores_refresh_credential_snapshot_and_agent_but_no_access_token() {
+async fn login_stores_the_token_only_in_the_credential_store_plus_snapshot_and_agent() {
     let api = FakeApi::start();
     let device = Device::new(&api);
     let report = device.login().await;
@@ -23,7 +23,10 @@ async fn login_stores_refresh_credential_snapshot_and_agent_but_no_access_token(
         .unwrap()
         .expect("credential in the store");
     assert_eq!(credential.user_id.as_deref(), Some("user_a"));
-    // The snapshot is on disk; no access token and no refresh credential appear anywhere on disk.
+    // The token lasts 30 days: there is no refresh, so this is the whole session.
+    let lifetime = credential.expires_at - snapshot::now();
+    assert!(lifetime > time::Duration::days(29) && lifetime <= time::Duration::days(30));
+    // The snapshot is on disk; the access token appears nowhere on disk, only in the credential store.
     let snapshot = snapshot::load(&device.env.snapshot_path())
         .unwrap()
         .expect("snapshot");
@@ -32,10 +35,10 @@ async fn login_stores_refresh_credential_snapshot_and_agent_but_no_access_token(
     for entry in walk(device.data.path()) {
         on_disk.push_str(&std::fs::read_to_string(&entry).unwrap_or_default());
     }
-    assert!(!on_disk.contains(&credential.refresh_credential));
+    assert!(!on_disk.contains(&credential.access_token));
     assert!(
         !on_disk.contains("at_"),
-        "access tokens must stay in memory"
+        "access tokens must stay in the credential store"
     );
 }
 
@@ -53,14 +56,21 @@ fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 }
 
 #[tokio::test]
-async fn two_devices_have_independent_sessions_and_logout_revokes_only_one() {
+async fn logout_forgets_the_token_on_this_device_only_and_leaves_the_server_alone() {
     let api = FakeApi::start();
     let (laptop, desktop) = (Device::new(&api), Device::new(&api));
     laptop.login().await;
     desktop.login().await;
 
-    let report = Session::new(&laptop.env).logout().await.unwrap();
+    let requests = api.count("POST /v1/auth/logout");
+    let report = Session::new(&laptop.env).logout(false).await.unwrap();
     assert!(report.was_logged_in);
+    assert!(!report.all_devices);
+    assert_eq!(
+        api.count("POST /v1/auth/logout"),
+        requests,
+        "a plain logout never calls the API"
+    );
     assert!(laptop.creds.load(&laptop.env.account()).unwrap().is_none());
     assert!(
         snapshot::load(&laptop.env.snapshot_path())
@@ -73,11 +83,54 @@ async fn two_devices_have_independent_sessions_and_logout_revokes_only_one() {
         Err(Error::NotLoggedIn)
     ));
 
-    // The other device still works and rotates its credential normally.
+    // The other device is untouched.
     Session::new(&desktop.env)
         .authenticate()
         .await
         .expect("desktop session unaffected");
+}
+
+#[tokio::test]
+async fn logout_all_ends_every_session_of_the_account_on_the_server() {
+    let api = FakeApi::start();
+    api.with(|s| s.snapshot_ttl = -5); // every window is already over, so each command hits the API
+    let (laptop, desktop) = (Device::new(&api), Device::new(&api));
+    laptop.login().await;
+    desktop.login().await;
+
+    let report = Session::new(&laptop.env).logout(true).await.unwrap();
+    assert!(report.was_logged_in && report.all_devices);
+    assert!(laptop.creds.load(&laptop.env.account()).unwrap().is_none());
+
+    // The desktop's token is now rejected by the server, so it signs in again.
+    assert!(matches!(
+        Session::new(&desktop.env).authenticate().await,
+        Err(Error::SessionExpired)
+    ));
+    assert!(
+        desktop
+            .creds
+            .load(&desktop.env.account())
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn logout_all_still_clears_local_state_when_the_server_cannot_be_reached() {
+    let api = FakeApi::start();
+    let device = Device::new(&api);
+    device.login().await;
+    drop(api);
+
+    let err = Session::new(&device.env).logout(true).await.unwrap_err();
+    assert!(matches!(err, Error::Network(_)));
+    assert!(device.creds.load(&device.env.account()).unwrap().is_none());
+    assert!(
+        snapshot::load(&device.env.snapshot_path())
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -175,8 +228,9 @@ async fn role_change_refreshes_the_snapshot_after_a_403() {
 }
 
 #[tokio::test]
-async fn concurrent_processes_never_present_the_same_refresh_credential() {
+async fn concurrent_processes_share_one_token_without_conflicts() {
     let api = FakeApi::start();
+    api.with(|s| s.snapshot_ttl = -5); // every process has to refresh the snapshot
     let device = Device::new(&api);
     device.login().await;
     let handles: Vec<_> = (0..6)
@@ -194,26 +248,26 @@ async fn concurrent_processes_never_present_the_same_refresh_credential() {
     for h in handles {
         h.join().unwrap().expect("authenticate under contention");
     }
-    assert_eq!(
-        api.with(|s| s.reuse_detected),
-        0,
-        "rotation must be serialised across processes"
-    );
-    assert_eq!(api.with(|s| s.refresh_calls), 6);
+    assert!(device.creds.load(&device.env.account()).unwrap().is_some());
 }
 
 #[tokio::test]
-async fn reusing_a_rotated_credential_revokes_the_device_and_clears_local_state() {
+async fn an_expired_token_is_dropped_locally_without_calling_the_api() {
     let api = FakeApi::start();
     let device = Device::new(&api);
     device.login().await;
-    let stale = device.creds.load(&device.env.account()).unwrap().unwrap();
-    Session::new(&device.env).authenticate().await.unwrap(); // rotates
-    device.creds.save(&device.env.account(), &stale).unwrap(); // an old copy comes back
+    let mut credential = device.creds.load(&device.env.account()).unwrap().unwrap();
+    credential.expires_at = snapshot::now() - time::Duration::seconds(1);
+    device
+        .creds
+        .save(&device.env.account(), &credential)
+        .unwrap();
 
+    let before = api.requests();
     let err = Session::new(&device.env).authenticate().await.unwrap_err();
     assert!(matches!(err, Error::SessionExpired));
     assert_eq!(err.exit_code(), specio::error::exit::AUTH);
+    assert_eq!(api.requests(), before, "there is no refresh to attempt");
     assert!(device.creds.load(&device.env.account()).unwrap().is_none());
     assert!(
         snapshot::load(&device.env.snapshot_path())
@@ -226,6 +280,7 @@ async fn reusing_a_rotated_credential_revokes_the_device_and_clears_local_state(
 #[tokio::test]
 async fn a_401_clears_authentication_state_and_stops_the_agent() {
     let api = FakeApi::start();
+    api.with(|s| s.snapshot_ttl = -5); // the cached window is over, so authenticate reaches the API
     let device = Device::new(&api);
     device.login().await;
     api.revoke_all_sessions();
@@ -245,11 +300,10 @@ async fn a_401_clears_authentication_state_and_stops_the_agent() {
 }
 
 #[tokio::test]
-async fn switching_accounts_revokes_the_old_session_and_drops_its_snapshot() {
+async fn switching_accounts_replaces_the_credential_and_drops_the_old_snapshot() {
     let api = FakeApi::start();
     let device = Device::new(&api);
     device.login().await;
-    let old = device.creds.load(&device.env.account()).unwrap().unwrap();
 
     api.with(|s| s.next_login_user = "user_b".into());
     let report = device.login().await;
@@ -268,17 +322,6 @@ async fn switching_accounts_revokes_the_old_session_and_drops_its_snapshot() {
             .as_deref(),
         Some("user_b")
     );
-
-    // The previous device session no longer works on the server.
-    let client = &device.env.client;
-    assert_eq!(
-        client
-            .refresh(&old.refresh_credential)
-            .await
-            .unwrap_err()
-            .api_status(),
-        Some(401)
-    );
 }
 
 #[tokio::test]
@@ -287,12 +330,12 @@ async fn the_agent_is_a_no_op_until_expiry_and_then_refreshes_with_etag() {
     let device = Device::new(&api);
     device.login().await;
     let session = Session::new(&device.env);
-    let calls = api.with(|s| s.refresh_calls);
+    let calls = api.count("GET /v1/projects");
     assert_eq!(
         session.agent_tick(false).await.unwrap(),
         AgentOutcome::StillFresh
     );
-    assert_eq!(api.with(|s| s.refresh_calls), calls);
+    assert_eq!(api.count("GET /v1/projects"), calls);
 
     // Close to expiry: the agent refreshes without any user command.
     let mut near = snapshot::load(&device.env.snapshot_path())

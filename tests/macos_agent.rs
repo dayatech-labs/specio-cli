@@ -95,9 +95,9 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
         "{}",
         String::from_utf8_lossy(&list.stderr)
     );
-    let calls_before = api.with(|s| s.refresh_calls);
+    let calls_before = api.count("GET /v1/projects");
 
-    // Run the job the way launchd would. The snapshot is near expiry, so the agent rotates and refreshes.
+    // Run the job the way launchd would. The snapshot is near expiry, so the agent refreshes it.
     let kick = Command::new("launchctl")
         .args(["kickstart", "-k", &format!("gui/{}/{LABEL}", uid())])
         .output()
@@ -108,14 +108,13 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
         String::from_utf8_lossy(&kick.stderr)
     );
     wait_for("the agent to refresh", Duration::from_secs(40), || {
-        api.with(|s| s.refresh_calls) > calls_before
+        api.count("GET /v1/projects") > calls_before
     });
     wait_for("the agent to exit cleanly", Duration::from_secs(15), || {
         launchctl_print().is_some_and(|p| p.contains("last exit code = 0"))
     });
-    assert_eq!(api.with(|s| s.reuse_detected), 0);
 
-    // Logout revokes the device, removes the credential, the cache, and the LaunchAgent.
+    // Logout removes the credential, the cache, and the LaunchAgent.
     let logout = specio(&api.url, &["logout"]);
     assert!(
         logout.status.success(),

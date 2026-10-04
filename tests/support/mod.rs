@@ -8,7 +8,7 @@ use specio::credentials::MemoryStore;
 use specio::dirs::AppDirs;
 use specio::env::Env;
 use specio::hashing::{git_blob_sha, sha256_bytes, sha256_hex};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 pub mod http;
@@ -20,8 +20,6 @@ pub const REPO: &str = "acme/payment-specs";
 pub struct Session {
     user: String,
     access: Option<String>,
-    refresh: String,
-    previous_refresh: HashSet<String>,
     revoked: bool,
 }
 
@@ -44,8 +42,8 @@ pub struct State {
     pub snapshot_ttl: i64,
     pub send_304_headers: bool,
     pub forbid_writes: bool,
-    pub refresh_calls: usize,
-    pub reuse_detected: usize,
+    /// Lifetime of the access token the next login receives (the real API issues 30 days).
+    pub token_ttl: i64,
     pub log: Vec<String>,
     /// Move the head (an external push) right after serving the next `sync`.
     pub move_head_after_sync: bool,
@@ -138,8 +136,7 @@ impl State {
             snapshot_ttl: 600,
             send_304_headers: true,
             forbid_writes: false,
-            refresh_calls: 0,
-            reuse_detected: 0,
+            token_ttl: 30 * 24 * 3600,
             log: vec![],
             move_head_after_sync: false,
             fail_path: None,
@@ -262,71 +259,39 @@ fn handle(
             st.cli_requests.insert(id, (challenge, true));
             let user = st.next_login_user.clone();
             let session_id = st.next("sess");
-            let (access, refresh) = (st.next("at"), st.next("rt"));
+            let access = st.next("at");
             st.access_index.insert(access.clone(), session_id.clone());
             st.sessions.insert(
                 session_id,
                 Session {
                     user,
                     access: Some(access.clone()),
-                    refresh: refresh.clone(),
-                    previous_refresh: HashSet::new(),
                     revoked: false,
                 },
             );
             return (
                 200,
-                json!({ "access_token": access, "access_token_expires_at": iso(900), "refresh_credential": refresh }),
-                vec![],
-            );
-        }
-        ("POST", "/v1/auth/cli/refresh") => {
-            st.refresh_calls += 1;
-            let presented = body["refresh_credential"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            let found = st
-                .sessions
-                .iter()
-                .find(|(_, s)| s.refresh == presented || s.previous_refresh.contains(&presented))
-                .map(|(id, _)| id.clone());
-            let Some(id) = found else {
-                return error(401, "unauthorized", "Invalid credentials", None);
-            };
-            let (access, refresh) = (st.next("at"), st.next("rt"));
-            let session = st.sessions.get_mut(&id).expect("session");
-            if session.revoked {
-                return error(401, "unauthorized", "Invalid credentials", None);
-            }
-            if session.refresh != presented {
-                session.revoked = true;
-                st.reuse_detected += 1;
-                return error(401, "unauthorized", "Invalid credentials", None);
-            }
-            session.previous_refresh.insert(presented);
-            session.refresh = refresh.clone();
-            session.access = Some(access.clone());
-            st.access_index.insert(access.clone(), id);
-            return (
-                200,
-                json!({ "access_token": access, "access_token_expires_at": iso(900), "refresh_credential": refresh }),
+                json!({ "access_token": access, "access_token_expires_at": iso(st.token_ttl) }),
                 vec![],
             );
         }
         ("POST", "/v1/auth/logout") => {
-            let presented = body["refresh_credential"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            let found = st.sessions.iter_mut().find(|(_, s)| s.refresh == presented);
-            return match found {
-                Some((_, s)) => {
-                    s.revoked = true;
-                    (204, Value::Null, vec![])
-                }
-                None => error(401, "unauthorized", "Invalid credentials", None),
+            // Stateless tokens: only `all` revokes anything, and it ends every session of the user.
+            let Some(user) = bearer.as_deref().and_then(|t| st.user_for(t)) else {
+                return error(
+                    401,
+                    "unauthorized",
+                    "Missing, invalid, expired, or revoked credentials",
+                    None,
+                );
             };
+            if body["all"].as_bool() == Some(true) {
+                st.sessions
+                    .values_mut()
+                    .filter(|s| s.user == user)
+                    .for_each(|s| s.revoked = true);
+            }
+            return (204, Value::Null, vec![]);
         }
         _ => {}
     }

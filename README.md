@@ -75,7 +75,7 @@ Add `--json` to any command for machine-readable output (errors are JSON on stde
 
 | Command | What it does |
 | --- | --- |
-| `login` / `logout` | PKCE device login; logout revokes this device and deletes local credentials and cache |
+| `login` / `logout [--all]` | PKCE device login; logout deletes the local token and cache. A token cannot be revoked on its own: `--all` ends every session of your account (all devices and the Web app) |
 | `list` | repositories you can use, from the local capability cache while it is valid |
 | `init <repo> --type <frontend\|backend\|cli>` | writes `.specio/config.toml`, creates `specs/`, updates `.gitignore`; re-init needs `--reconfigure` |
 | `pull` | full-project sync; never overwrites local work |
@@ -111,8 +111,10 @@ specs/                   the working copy (ignored by Git)
 
 ## Security
 
-* The Specio refresh credential lives only in the OS credential store (Keychain, Credential Manager, Secret
-  Service). The 15-minute access token lives only in memory. Google and GitHub tokens never reach the CLI.
+* The Specio access token lives only in the OS credential store (Keychain, Credential Manager, Secret
+  Service). It is signed, valid for 30 days, and there is no refresh: when it expires (or the API answers `401`) the
+  CLI removes its local state, commands exit with code 3, and you run `specio login` again. Google and GitHub tokens
+  never reach the CLI.
 * The capability cache (projects, roles, expiry) is stored in the per-user application-data folder with owner-only
   permissions. It is never used after it expires and never authorizes anything: the API checks every request.
 * A background job (launchd on macOS, a systemd user timer on Linux, Task Scheduler on Windows) refreshes the cache

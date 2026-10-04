@@ -82,7 +82,7 @@ pub async fn run(cli: Cli, env: &Env) -> Result<u8> {
     let json = cli.json;
     match cli.command {
         Command::Login(_) => Ok(emit(json, &Session::new(env).login().await?)),
-        Command::Logout => Ok(emit(json, &Session::new(env).logout().await?)),
+        Command::Logout(args) => Ok(emit(json, &Session::new(env).logout(args.all).await?)),
         Command::List => Ok(emit(json, &init::list(env).await?)),
         Command::Init(args) => {
             let root = std::env::current_dir().map_err(|e| Error::Io {

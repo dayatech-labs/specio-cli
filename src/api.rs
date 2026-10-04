@@ -114,9 +114,7 @@ pub struct CliRequest {
 #[derive(Deserialize)]
 pub struct Tokens {
     pub access_token: String,
-    #[allow(dead_code)]
     pub access_token_expires_at: String,
-    pub refresh_credential: String,
 }
 
 impl std::fmt::Debug for Tokens {
@@ -287,6 +285,10 @@ impl Client {
                 return Ok(response);
             }
             let error = read_error(response, status, request_id).await;
+            // Tokens cannot be refreshed: a rejected one always means signing in again.
+            if status == StatusCode::UNAUTHORIZED && call.token.is_some() {
+                return Err(Error::SessionExpired);
+            }
             let retryable =
                 matches!(status.as_u16(), 429 | 503) && call.retry && attempt < READ_ATTEMPTS;
             let wait = error.retry_after.filter(|s| *s <= MAX_RETRY_WAIT);
@@ -354,19 +356,11 @@ impl Client {
         Self::json(self.send(self.post_call(&path, None, body)).await?).await
     }
 
-    pub async fn refresh(&self, refresh_credential: &str) -> Result<Tokens> {
-        let body = serde_json::json!({ "refresh_credential": refresh_credential });
-        Self::json(
-            self.send(self.post_call("/v1/auth/cli/refresh", None, body))
-                .await?,
-        )
-        .await
-    }
-
-    /// Revokes the device session identified by the refresh credential.
-    pub async fn logout(&self, refresh_credential: &str) -> Result<()> {
-        let body = serde_json::json!({ "refresh_credential": refresh_credential });
-        self.send(self.post_call("/v1/auth/logout", None, body))
+    /// Ends every token this user holds, on every device and in the Web app. Tokens are stateless, so
+    /// there is no way to revoke just this one.
+    pub async fn logout_everywhere(&self, token: &SecretString) -> Result<()> {
+        let body = serde_json::json!({ "all": true });
+        self.send(self.post_call("/v1/auth/logout", Some(token), body))
             .await
             .map(|_| ())
     }
