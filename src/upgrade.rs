@@ -235,8 +235,11 @@ pub async fn install_binary(
     tmp.write_all(&bytes).ctx("write the new binary")?;
     tmp.as_file().sync_all().ctx("sync the new binary")?;
     make_executable(&tmp)?;
-    smoke_test(tmp.path(), expected)?;
-    replace(tmp, exe)
+    // Close the write handle before running the file: Linux refuses to execute a file that is still open
+    // for writing ("Text file busy"). The path stays reserved, and is removed again unless we persist it.
+    let staged = tmp.into_temp_path();
+    smoke_test(&staged, expected)?;
+    replace(staged, exe)
 }
 
 #[cfg(unix)]
@@ -253,12 +256,19 @@ fn make_executable(_: &NamedTempFile) -> Result<()> {
 }
 
 fn smoke_test(path: &Path, expected: &Version) -> Result<()> {
-    // A text-file-busy race is possible right after writing; the handle is closed by now on all targets
-    // we ship, but keep the failure message actionable.
-    let output = std::process::Command::new(path)
-        .arg("--version")
-        .output()
-        .map_err(|e| Error::Other(format!("the new binary does not run: {e}")))?;
+    // The file is closed, but another thread that forked while it was open can still make the first
+    // exec report `ExecutableFileBusy` for a moment: retry briefly instead of failing a valid upgrade.
+    let mut attempts = 0;
+    let output = loop {
+        match std::process::Command::new(path).arg("--version").output() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempts < 10 => {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => return Err(Error::Other(format!("the new binary does not run: {e}"))),
+            Ok(output) => break output,
+        }
+    };
     let text = String::from_utf8_lossy(&output.stdout);
     if !output.status.success() || !text.contains(&expected.to_string()) {
         return Err(Error::Other(
@@ -269,8 +279,8 @@ fn smoke_test(path: &Path, expected: &Version) -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn replace(tmp: NamedTempFile, exe: &Path) -> Result<()> {
-    tmp.persist(exe).map(|_| ()).map_err(|e| Error::Io {
+fn replace(staged: tempfile::TempPath, exe: &Path) -> Result<()> {
+    staged.persist(exe).map_err(|e| Error::Io {
         context: format!("replace {}", exe.display()),
         source: e.error,
     })
@@ -278,12 +288,12 @@ fn replace(tmp: NamedTempFile, exe: &Path) -> Result<()> {
 
 /// A running `.exe` cannot be overwritten on Windows, but it can be renamed away.
 #[cfg(windows)]
-fn replace(tmp: NamedTempFile, exe: &Path) -> Result<()> {
+fn replace(staged: tempfile::TempPath, exe: &Path) -> Result<()> {
     let old = exe.with_extension("exe.old");
     let _ = std::fs::remove_file(&old);
     std::fs::rename(exe, &old).ctx(format!("move the current binary aside ({})", exe.display()))?;
-    match tmp.persist(exe) {
-        Ok(_) => Ok(()),
+    match staged.persist(exe) {
+        Ok(()) => Ok(()),
         Err(e) => {
             let _ = std::fs::rename(&old, exe);
             Err(Error::Io {

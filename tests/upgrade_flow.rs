@@ -1,6 +1,8 @@
 use semver::Version;
 use specio::hashing::sha256_hex;
-use specio::upgrade::{self, Asset, Install};
+#[cfg(unix)]
+use specio::upgrade::Asset;
+use specio::upgrade::{self, Install};
 use std::collections::HashMap;
 
 #[path = "support/http.rs"]
