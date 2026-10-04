@@ -1,0 +1,21 @@
+name: weekly-audit
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Outdated direct dependencies (report only; Dependabot opens the PRs)
+        run: |
+          cargo install cargo-outdated --locked --quiet || true
+          cargo outdated --root-deps-only || true

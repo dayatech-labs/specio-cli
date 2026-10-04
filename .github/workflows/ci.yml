@@ -44,6 +44,23 @@ jobs:
           toolchain: ${{ steps.msrv.outputs.version }}
       - run: cargo check --locked --all-targets
 
+  installers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sh -n scripts/install.sh && shellcheck -S warning scripts/install.sh
+      - run: python3 -m py_compile scripts/release_manifest.py scripts/render_packaging.py scripts/next_version.py scripts/stamp_version.py
+      - run: python3 scripts/test_release_scripts.py
+      - name: Release manifest and packaging render from sample binaries
+        run: |
+          d=$(mktemp -d); v=9.9.9
+          for t in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl; do echo bin > "$d/specio-$v-$t"; echo a > "$d/specio-$v-$t.tar.gz"; done
+          echo bin > "$d/specio-$v-x86_64-pc-windows-msvc.exe"; echo a > "$d/specio-$v-x86_64-pc-windows-msvc.zip"
+          python3 scripts/release_manifest.py "$d" $v 0123456789abcdef0123456789abcdef01234567 https://example.test/dl
+          python3 scripts/render_packaging.py "$d" $v "$d/out"
+          grep -q 'class Specio' "$d/out/specio.rb"
+          python3 -c "import json,sys; m=json.load(open('$d/manifest.json')); assert m['version']=='$v' and len(m['artifacts'])==4"
+
   supply-chain:
     runs-on: ubuntu-latest
     steps:

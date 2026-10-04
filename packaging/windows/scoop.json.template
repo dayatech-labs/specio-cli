@@ -1,0 +1,21 @@
+{
+  "version": "@VERSION@",
+  "description": "Sync product specs into implementation repositories",
+  "homepage": "https://github.com/dayatech-labs/specio-cli",
+  "license": "Proprietary",
+  "architecture": {
+    "64bit": {
+      "url": "@WINDOWS_URL@",
+      "hash": "@WINDOWS_SHA256@"
+    }
+  },
+  "bin": "specio.exe",
+  "checkver": { "github": "https://github.com/dayatech-labs/specio-cli" },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/dayatech-labs/specio-cli/releases/download/v$version/specio-$version-x86_64-pc-windows-msvc.zip"
+      }
+    }
+  }
+}

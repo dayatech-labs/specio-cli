@@ -1,0 +1,19 @@
+# Single-file WinGet manifest (schema 1.9 singleton). Submit it with `wingetcreate` or a PR to microsoft/winget-pkgs.
+PackageIdentifier: Dayatech.Specio
+PackageVersion: "@VERSION@"
+PackageLocale: en-US
+Publisher: Dayatech
+PackageName: Specio
+License: Proprietary
+ShortDescription: Sync product specs into implementation repositories
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: specio.exe
+        PortableCommandAlias: specio
+    InstallerUrl: @WINDOWS_URL@
+    InstallerSha256: @WINDOWS_SHA256@
+ManifestType: singleton
+ManifestVersion: 1.9.0

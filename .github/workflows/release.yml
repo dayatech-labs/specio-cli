@@ -1,0 +1,173 @@
+# Automatic release on every push to `main`. The version and the tag come from the commit history
+# (conventional commits, see scripts/next_version.py): feat -> minor, fix/perf/refactor -> patch,
+# breaking -> major (minor before 1.0); docs/chore/test/ci-only pushes release nothing.
+#
+# Every target is built from the same commit, tested, and smoke-tested, then the GitHub Release is
+# published in one step (draft -> assets -> publish). The tag is created at that last step, on the
+# built commit, so a failed build never leaves a tag behind. (Tags made with GITHUB_TOKEN do not
+# trigger other workflows, which is why this workflow runs on `main`, not on tags.)
+# The repository must be public so installers can download anonymously.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+# Releases are serialised: two quick pushes never compute the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.next.outputs.release }}
+      version: ${{ steps.next.outputs.version }}
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Release scripts are correct
+        run: python3 scripts/test_release_scripts.py
+      - id: next
+        run: |
+          python3 scripts/next_version.py | tee -a "$GITHUB_OUTPUT"
+          if grep -q '^tag=' "$GITHUB_OUTPUT" && git rev-parse -q --verify "refs/tags/$(sed -n 's/^tag=//p' "$GITHUB_OUTPUT")" >/dev/null; then
+            echo "tag already exists; refusing to release twice"; exit 1
+          fi
+
+  verify:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+      - name: Installer scripts are valid
+        run: |
+          sh -n scripts/install.sh
+          shellcheck -S warning scripts/install.sh
+          python3 -m py_compile scripts/release_manifest.py scripts/render_packaging.py scripts/next_version.py scripts/stamp_version.py
+
+  build:
+    needs: [plan, verify]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin, exe: "", pack: tar.gz }
+          - { os: macos-15-intel, target: x86_64-apple-darwin, exe: "", pack: tar.gz }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, exe: "", pack: tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, exe: ".exe", pack: zip }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      SPECIO_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Stamp the release version (CI only, not committed)
+        run: python3 scripts/stamp_version.py "${{ needs.plan.outputs.version }}"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Test
+        run: cargo test --locked --target ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Smoke test
+        run: |
+          out=$(target/${{ matrix.target }}/release/specio${{ matrix.exe }} --version)
+          echo "$out"
+          echo "$out" | grep -q "specio ${{ needs.plan.outputs.version }}"
+          echo "$out" | grep -q "commit: ${{ github.sha }}"
+          echo "$out" | grep -q "target: ${{ matrix.target }}"
+      - name: Package
+        run: |
+          version="${{ needs.plan.outputs.version }}"
+          target="${{ matrix.target }}"
+          mkdir -p dist stage
+          cp "target/$target/release/specio${{ matrix.exe }}" "dist/specio-$version-$target${{ matrix.exe }}"
+          cp "target/$target/release/specio${{ matrix.exe }}" "stage/specio${{ matrix.exe }}"
+          cp README.md stage/
+          if [ "${{ matrix.pack }}" = "zip" ]; then
+            (cd stage && 7z a -tzip "../dist/specio-$version-$target.zip" .)
+          else
+            tar -czf "dist/specio-$version-$target.tar.gz" -C stage .
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - name: Checksums, manifest, installers, package-manager files
+        run: |
+          version="${{ needs.plan.outputs.version }}"
+          base="https://github.com/${{ github.repository }}/releases/download/v$version"
+          python3 scripts/release_manifest.py dist "$version" "${{ github.sha }}" "$base"
+          python3 scripts/render_packaging.py dist "$version" dist
+          cp scripts/install.sh scripts/install.ps1 dist/
+          ls -l dist
+      - name: Publish atomically (draft, upload, then publish)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ needs.plan.outputs.tag }}"
+          # The tag does not exist yet: publishing the release creates it on the built commit.
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "specio $tag" --generate-notes
+          gh release upload "$tag" dist/* --clobber
+          gh release edit "$tag" --draft=false --latest
+
+  verify-install:
+    needs: [plan, publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install the published release (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL "https://github.com/${{ github.repository }}/releases/download/v${{ needs.plan.outputs.version }}/install.sh" | sh -s -- --version "${{ needs.plan.outputs.version }}"
+          "$HOME/.local/bin/specio" --version
+          "$HOME/.local/bin/specio" help > /dev/null
+          "$HOME/.local/bin/specio" upgrade --check
+      - name: Install the published release (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = "${{ needs.plan.outputs.version }}"
+          $script = Invoke-RestMethod "https://github.com/${{ github.repository }}/releases/download/v$v/install.ps1"
+          & ([scriptblock]::Create($script)) -Version $v
+          $exe = Join-Path $env:LOCALAPPDATA "Specio\bin\specio.exe"
+          & $exe --version
+          & $exe help | Out-Null
+          & $exe upgrade --check

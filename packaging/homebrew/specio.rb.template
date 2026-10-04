@@ -1,0 +1,31 @@
+class Specio < Formula
+  desc "Sync product specs into implementation repositories"
+  homepage "https://github.com/dayatech-labs/specio-cli"
+  version "@VERSION@"
+
+  on_macos do
+    on_arm do
+      url "@MACOS_ARM_URL@"
+      sha256 "@MACOS_ARM_SHA256@"
+    end
+    on_intel do
+      url "@MACOS_INTEL_URL@"
+      sha256 "@MACOS_INTEL_SHA256@"
+    end
+  end
+
+  on_linux do
+    on_intel do
+      url "@LINUX_URL@"
+      sha256 "@LINUX_SHA256@"
+    end
+  end
+
+  def install
+    bin.install "specio"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/specio --version")
+  end
+end
