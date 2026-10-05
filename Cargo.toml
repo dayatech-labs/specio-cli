@@ -1,20 +1,20 @@
 [package]
-name = "specio"
+name = "speq"
 version = "0.1.0"
 edition = "2024"
 # 1.89: std file locking (`File::lock`) and the minimum of the keyring/time/uuid crates.
 rust-version = "1.89"
-description = "Specio CLI: sync product specs into implementation repositories"
+description = "Speq CLI: sync product specs into implementation repositories"
 license = "UNLICENSED"
 publish = false
 build = "build.rs"
 
 [lib]
-name = "specio"
+name = "speq"
 path = "src/lib.rs"
 
 [[bin]]
-name = "specio"
+name = "speq"
 path = "src/main.rs"
 
 [dependencies]

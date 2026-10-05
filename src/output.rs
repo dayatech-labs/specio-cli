@@ -60,7 +60,7 @@ impl Human for LogoutReport {
         if self.was_logged_in && self.all_devices {
             "Logged out everywhere. Every session of this account was ended and local credentials were removed.".into()
         } else if self.was_logged_in {
-            "Logged out. Local credentials were removed; the token itself stays valid until it expires (use `specio logout --all` to end it).".into()
+            "Logged out. Local credentials were removed; the token itself stays valid until it expires (use `speq logout --all` to end it).".into()
         } else {
             "You were not logged in; local state was cleaned.".into()
         }
@@ -102,7 +102,7 @@ impl Human for ListReport {
 impl Human for InitReport {
     fn human(&self) -> String {
         let mut out = format!(
-            "{} {} ({}, branch {}) into ./{}\nNext: run `specio pull`.",
+            "{} {} ({}, branch {}) into ./{}\nNext: run `speq pull`.",
             if self.reconfigured {
                 "Reconfigured"
             } else {
@@ -147,7 +147,7 @@ impl Human for PullReport {
         if self.conflicts.is_empty() {
             out.push_str("Workspace is clean.");
         } else {
-            out.push_str(&format!("{} not applied; resolve with `specio diff <path>`, then edit the file and pull again. Push stays blocked until then.", plural(self.conflicts.len(), "path was", "paths were")));
+            out.push_str(&format!("{} not applied; resolve with `speq diff <path>`, then edit the file and pull again. Push stays blocked until then.", plural(self.conflicts.len(), "path was", "paths were")));
         }
         out
     }
@@ -185,7 +185,7 @@ impl Human for StatusReport {
             if self.up_to_date {
                 "(up to date)"
             } else {
-                "(run `specio pull`)"
+                "(run `speq pull`)"
             }
         );
         let mut any = false;
@@ -211,7 +211,7 @@ impl Human for StatusReport {
         }
         if !self.pending.is_empty() {
             out.push_str(&format!(
-                "{} pending from the last pull; `specio push` is blocked.\n",
+                "{} pending from the last pull; `speq push` is blocked.\n",
                 plural(self.pending.len(), "conflict", "conflicts")
             ));
         }
@@ -279,9 +279,9 @@ impl Human for CheckReport {
 impl Human for UpgradeReport {
     fn human(&self) -> String {
         if self.installed {
-            format!("Upgraded specio {} -> {}.", self.from, self.to)
+            format!("Upgraded speq {} -> {}.", self.from, self.to)
         } else {
-            format!("specio {} is already the latest version.", self.from)
+            format!("speq {} is already the latest version.", self.from)
         }
     }
 }

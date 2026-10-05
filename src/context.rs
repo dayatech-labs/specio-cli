@@ -1,4 +1,4 @@
-//! `specio context <epic>/<feature>`: a deterministic list of paths from the local working copy
+//! `speq context <epic>/<feature>`: a deterministic list of paths from the local working copy
 //! (the epic lives under `epics/<epic>/` in the repository).
 use crate::error::{Error, Result};
 use crate::paths::FEATURE_FILES;
@@ -18,13 +18,13 @@ pub fn context(ws: &Workspace, target: &str) -> Result<ContextReport> {
         .filter(|(_, f)| !f.contains('/'))
         .ok_or_else(|| {
             Error::invalid(
-                "use `specio context <epic>/<feature>`, for example `epic-payment/create-payment`",
+                "use `speq context <epic>/<feature>`, for example `epic-payment/create-payment`",
             )
         })?;
     ensure_valid_epic_feature(epic, feature)?;
 
     let lock = ws.load_lock()?;
-    let head_sha = lock.head_sha.clone().filter(|_| lock.pending.is_empty()).ok_or_else(|| Error::conflict("the workspace is not clean; run `specio pull` and resolve conflicts before generating context"))?;
+    let head_sha = lock.head_sha.clone().filter(|_| lock.pending.is_empty()).ok_or_else(|| Error::conflict("the workspace is not clean; run `speq pull` and resolve conflicts before generating context"))?;
 
     let mut candidates = vec!["llms.txt".to_string(), "README.md".to_string()];
     candidates.extend(
@@ -40,7 +40,7 @@ pub fn context(ws: &Workspace, target: &str) -> Result<ContextReport> {
     let exists = |p: &str| ws.local_path(p).is_file() && ws.check_target(p).is_ok();
     if !feature_paths.iter().any(|p| exists(p)) {
         return Err(Error::invalid(format!(
-            "no documents found for {epic}/{feature}; check the names with `specio status`"
+            "no documents found for {epic}/{feature}; check the names with `speq status`"
         )));
     }
     candidates.extend(feature_paths);

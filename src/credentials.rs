@@ -1,4 +1,4 @@
-//! The Specio access token lives only in the secure OS credential store.
+//! The Speq access token lives only in the secure OS credential store.
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -6,7 +6,7 @@ use std::fmt;
 use std::sync::Mutex;
 use time::OffsetDateTime;
 
-const SERVICE: &str = "specio-cli";
+const SERVICE: &str = "speq-cli";
 
 /// What is stored per API origin. Never contains Google/GitHub credentials.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -64,7 +64,7 @@ impl CredentialStore for KeyringStore {
         match Self::entry(account)?.get_password() {
             Ok(raw) => serde_json::from_str(&raw).map(Some).map_err(|_| {
                 Error::CredentialStore(
-                    "the stored credential is unreadable; run `specio login` again".into(),
+                    "the stored credential is unreadable; run `speq login` again".into(),
                 )
             }),
             Err(keyring::Error::NoEntry) => Ok(None),

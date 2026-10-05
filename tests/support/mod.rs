@@ -1,13 +1,13 @@
-//! A stateful in-process fake of the Specio API (the contract in `specio-api/contract/`).
+//! A stateful in-process fake of the Speq API (the contract in `speq-api/contract/`).
 #![allow(dead_code)]
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::{Value, json};
-use specio::agent::Scheduler;
-use specio::credentials::MemoryStore;
-use specio::dirs::AppDirs;
-use specio::env::Env;
-use specio::hashing::{git_blob_sha, sha256_bytes, sha256_hex};
+use speq::agent::Scheduler;
+use speq::credentials::MemoryStore;
+use speq::dirs::AppDirs;
+use speq::env::Env;
+use speq::hashing::{git_blob_sha, sha256_bytes, sha256_hex};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -324,8 +324,8 @@ fn handle(
         if headers.get("if-none-match") == Some(&etag) {
             let mut h = vec![("ETag".to_string(), etag)];
             if st.send_304_headers {
-                h.push(("X-Specio-Snapshot-Issued-At".into(), iso(0)));
-                h.push(("X-Specio-Snapshot-Expires-At".into(), iso(st.snapshot_ttl)));
+                h.push(("X-Speq-Snapshot-Issued-At".into(), iso(0)));
+                h.push(("X-Speq-Snapshot-Expires-At".into(), iso(st.snapshot_ttl)));
             }
             return (304, Value::Null, h);
         }
@@ -575,11 +575,11 @@ pub struct RecordingScheduler {
 }
 
 impl Scheduler for RecordingScheduler {
-    fn install(&self) -> specio::error::Result<()> {
+    fn install(&self) -> speq::error::Result<()> {
         self.installs.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
-    fn uninstall(&self) -> specio::error::Result<()> {
+    fn uninstall(&self) -> speq::error::Result<()> {
         self.uninstalls.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
@@ -598,9 +598,9 @@ impl Device {
         let data = tempfile::tempdir().expect("tempdir");
         let creds = Arc::new(MemoryStore::default());
         let scheduler = Arc::new(RecordingScheduler::default());
-        let api_url = specio::api::parse_api_url(&api.url).expect("api url");
+        let api_url = speq::api::parse_api_url(&api.url).expect("api url");
         let env = Env {
-            client: specio::api::Client::new(api_url.clone()).expect("client"),
+            client: speq::api::Client::new(api_url.clone()).expect("client"),
             dirs: AppDirs::at(data.path()),
             creds: creds.clone(),
             scheduler: scheduler.clone(),
@@ -618,7 +618,7 @@ impl Device {
     /// A second "process" on the same device: same data directory and credential store, own HTTP client.
     pub fn another_process(&self) -> Env {
         Env {
-            client: specio::api::Client::new(self.env.api_url.clone()).expect("client"),
+            client: speq::api::Client::new(self.env.api_url.clone()).expect("client"),
             dirs: AppDirs::at(self.data.path()),
             creds: self.creds.clone(),
             scheduler: self.scheduler.clone(),
@@ -627,8 +627,8 @@ impl Device {
         }
     }
 
-    pub async fn login(&self) -> specio::session::LoginReport {
-        specio::session::Session::new(&self.env)
+    pub async fn login(&self) -> speq::session::LoginReport {
+        speq::session::Session::new(&self.env)
             .login()
             .await
             .expect("login")
@@ -658,13 +658,13 @@ impl Fixture {
     }
 
     pub async fn init(&self) {
-        let options = specio::init::InitOptions {
+        let options = speq::init::InitOptions {
             repo: REPO,
             repository_type: "frontend",
             local_dir: "specs",
             reconfigure: false,
         };
-        specio::init::init(
+        speq::init::init(
             &self.device.env,
             &std::fs::canonicalize(self.workspace_dir.path()).expect("canonical"),
             options,
@@ -673,8 +673,8 @@ impl Fixture {
         .expect("init");
     }
 
-    pub fn ws(&self) -> specio::workspace::Workspace {
-        specio::workspace::Workspace::discover(self.workspace_dir.path()).expect("workspace")
+    pub fn ws(&self) -> speq::workspace::Workspace {
+        speq::workspace::Workspace::discover(self.workspace_dir.path()).expect("workspace")
     }
 
     pub fn path(&self, rel: &str) -> std::path::PathBuf {
@@ -691,7 +691,7 @@ impl Fixture {
         std::fs::write(p, content).expect("write");
     }
 
-    pub async fn pull(&self) -> specio::error::Result<specio::sync::pull::PullReport> {
-        specio::sync::pull::pull(&self.device.env, &self.ws()).await
+    pub async fn pull(&self) -> speq::error::Result<speq::sync::pull::PullReport> {
+        speq::sync::pull::pull(&self.device.env, &self.ws()).await
     }
 }

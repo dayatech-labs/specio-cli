@@ -1,4 +1,4 @@
-//! `specio upgrade`: verify and atomically replace the installed binary. It never runs on its own.
+//! `speq upgrade`: verify and atomically replace the installed binary. It never runs on its own.
 use crate::api::install_crypto_provider;
 use crate::error::{Error, IoContext, Result};
 use crate::hashing::sha256_hex;
@@ -11,8 +11,8 @@ use std::time::Duration;
 use tempfile::NamedTempFile;
 use url::Url;
 
-pub const DEFAULT_RELEASE_BASE: &str = "https://github.com/dayatech-labs/specio-cli/releases";
-pub const CURRENT_TARGET: &str = env!("SPECIO_TARGET");
+pub const DEFAULT_RELEASE_BASE: &str = "https://github.com/dayatech-labs/speq-cli/releases";
+pub const CURRENT_TARGET: &str = env!("SPEQ_TARGET");
 const MAX_MANIFEST_BYTES: usize = 1024 * 1024;
 const MAX_BINARY_BYTES: u64 = 200 * 1024 * 1024;
 
@@ -60,7 +60,7 @@ fn allowed_url(url: &Url) -> bool {
 pub fn http_client() -> Result<reqwest::Client> {
     install_crypto_provider();
     reqwest::Client::builder()
-        .user_agent(format!("specio-cli/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("speq-cli/{}", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(120))
         .connect_timeout(Duration::from_secs(10))
         // Release assets redirect to a CDN; follow only to https (or loopback in tests).
@@ -179,7 +179,7 @@ pub enum Install {
 
 pub fn official_dir(home: Option<&Path>, local_app_data: Option<&Path>) -> Option<PathBuf> {
     if cfg!(windows) {
-        local_app_data.map(|p| p.join("Specio").join("bin"))
+        local_app_data.map(|p| p.join("Speq").join("bin"))
     } else {
         home.map(|h| h.join(".local").join("bin"))
     }
@@ -188,17 +188,17 @@ pub fn official_dir(home: Option<&Path>, local_app_data: Option<&Path>) -> Optio
 pub fn detect_install(exe: &Path, official: Option<&Path>) -> Install {
     let path = exe.to_string_lossy().replace('\\', "/").to_lowercase();
     let managed = [
-        ("/cellar/", "Homebrew", "brew upgrade specio"),
-        ("/homebrew/", "Homebrew", "brew upgrade specio"),
-        ("/linuxbrew/", "Homebrew", "brew upgrade specio"),
-        ("/scoop/", "Scoop", "scoop update specio"),
-        ("/winget/", "WinGet", "winget upgrade Dayatech.Specio"),
+        ("/cellar/", "Homebrew", "brew upgrade speq"),
+        ("/homebrew/", "Homebrew", "brew upgrade speq"),
+        ("/linuxbrew/", "Homebrew", "brew upgrade speq"),
+        ("/scoop/", "Scoop", "scoop update speq"),
+        ("/winget/", "WinGet", "winget upgrade Dayatech.Speq"),
         (
             "/microsoft/windowsapps/",
             "WinGet",
-            "winget upgrade Dayatech.Specio",
+            "winget upgrade Dayatech.Speq",
         ),
-        ("/nix/store/", "Nix", "nix profile upgrade specio"),
+        ("/nix/store/", "Nix", "nix profile upgrade speq"),
     ];
     if let Some((_, manager, command)) = managed.iter().find(|(marker, _, _)| path.contains(marker))
     {
@@ -229,7 +229,7 @@ pub async fn install_binary(
         .parent()
         .ok_or_else(|| Error::Other("the executable has no parent directory".into()))?;
     let mut tmp = tempfile::Builder::new()
-        .prefix(".specio-upgrade-")
+        .prefix(".speq-upgrade-")
         .tempfile_in(dir)
         .ctx(format!("create a temporary file in {}", dir.display()))?;
     tmp.write_all(&bytes).ctx("write the new binary")?;
@@ -312,12 +312,12 @@ mod tests {
     fn detects_package_managers_and_official_installs() {
         let official = Path::new("/home/a/.local/bin");
         assert_eq!(
-            detect_install(Path::new("/home/a/.local/bin/specio"), Some(official)),
+            detect_install(Path::new("/home/a/.local/bin/speq"), Some(official)),
             Install::Official
         );
         assert!(matches!(
             detect_install(
-                Path::new("/opt/homebrew/Cellar/specio/1.0.0/bin/specio"),
+                Path::new("/opt/homebrew/Cellar/speq/1.0.0/bin/speq"),
                 Some(official)
             ),
             Install::Managed {
@@ -327,7 +327,7 @@ mod tests {
         ));
         assert!(matches!(
             detect_install(
-                Path::new("C:\\Users\\a\\scoop\\apps\\specio\\current\\specio.exe"),
+                Path::new("C:\\Users\\a\\scoop\\apps\\speq\\current\\speq.exe"),
                 None
             ),
             Install::Managed {
@@ -337,7 +337,7 @@ mod tests {
         ));
         assert_eq!(
             detect_install(
-                Path::new("/work/specio-cli/target/debug/specio"),
+                Path::new("/work/speq-cli/target/debug/speq"),
                 Some(official)
             ),
             Install::Unmanaged

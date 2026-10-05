@@ -1,4 +1,4 @@
-//! `specio push`: send local changes as one batch through the API. Never merges, never retries
+//! `speq push`: send local changes as one batch through the API. Never merges, never retries
 //! a mutation on its own, and never moves the lock unless the API accepted the whole batch.
 use super::{require_safe, settle};
 use crate::api::{ChangeOperation, ChangesRequest};
@@ -57,7 +57,7 @@ pub fn build_draft(ws: &Workspace) -> Result<Draft> {
                     .ok_or_else(|| Error::Other(format!("{path} disappeared while scanning")))?;
                 if git_blob_sha(&bytes) != *local_sha {
                     return Err(Error::conflict(format!(
-                        "{path} changed while scanning; run `specio push` again"
+                        "{path} changed while scanning; run `speq push` again"
                     )));
                 }
                 if bytes.len() > MAX_DOCUMENT_BYTES {
@@ -98,7 +98,7 @@ pub fn build_draft(ws: &Workspace) -> Result<Draft> {
 pub fn idempotency_key(base_commit_sha: &str, operations: &[ChangeOperation]) -> String {
     let canonical =
         serde_json::to_string(&(base_commit_sha, operations)).expect("operations serialise");
-    format!("specio-{}", &sha256_hex(canonical.as_bytes())[..40])
+    format!("speq-{}", &sha256_hex(canonical.as_bytes())[..40])
 }
 
 pub async fn push(env: &Env, ws: &Workspace) -> Result<PushReport> {
@@ -111,7 +111,7 @@ pub async fn push(env: &Env, ws: &Workspace) -> Result<PushReport> {
             format!("unresolved: {}", lock.pending.join(", "))
         };
         return Err(Error::conflict(format!(
-            "the workspace is not clean ({detail}); resolve with `specio status`, `specio diff <path>`, and `specio pull` before pushing"
+            "the workspace is not clean ({detail}); resolve with `speq status`, `speq diff <path>`, and `speq pull` before pushing"
         )));
     };
 
@@ -160,7 +160,7 @@ pub async fn push(env: &Env, ws: &Workspace) -> Result<PushReport> {
         Ok(r) => r,
         Err(Error::Api(e)) if e.status == 409 => {
             return Err(Error::conflict(format!(
-                "the push was rejected ({}) and nothing was committed; your local files are untouched. Run `specio status`, `specio diff <path>`, then `specio pull`",
+                "the push was rejected ({}) and nothing was committed; your local files are untouched. Run `speq status`, `speq diff <path>`, then `speq pull`",
                 e.message
             )));
         }
@@ -200,7 +200,7 @@ pub async fn push(env: &Env, ws: &Workspace) -> Result<PushReport> {
     let saved = ws.save_manifest(&manifest);
     if let Err(e) = applied.and(saved) {
         return Err(Error::Other(format!(
-            "the push succeeded (commit {}) but local state could not be updated: {e}; run `specio pull`",
+            "the push succeeded (commit {}) but local state could not be updated: {e}; run `speq pull`",
             result.commit_sha
         )));
     }

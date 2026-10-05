@@ -34,7 +34,7 @@ pub fn require_safe(scan: &LocalScan) -> Result<()> {
         Ok(())
     } else {
         Err(Error::invalid(format!(
-            "the working copy contains symbolic links or special files, which Specio never follows: {}",
+            "the working copy contains symbolic links or special files, which Speq never follows: {}",
             scan.unsafe_paths.join(", ")
         )))
     }

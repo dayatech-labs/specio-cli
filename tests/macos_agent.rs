@@ -8,15 +8,15 @@ use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 use support::FakeApi;
 
-const LABEL: &str = "com.dayatech.specio.agent";
+const LABEL: &str = "com.dayatech.speq.agent";
 
-fn specio(api: &str, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_specio"))
+fn speq(api: &str, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_speq"))
         .arg("--api-url")
         .arg(api)
         .args(args)
         .output()
-        .expect("run specio")
+        .expect("run speq")
 }
 
 fn uid() -> String {
@@ -53,7 +53,7 @@ fn wait_for(what: &str, limit: Duration, mut done: impl FnMut() -> bool) {
 struct Cleanup<'a>(&'a str);
 impl Drop for Cleanup<'_> {
     fn drop(&mut self) {
-        let _ = specio(self.0, &["logout"]);
+        let _ = speq(self.0, &["logout"]);
     }
 }
 
@@ -63,7 +63,7 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
     // Never touch an agent that belongs to a real login.
     assert!(
         !plist().exists(),
-        "{} already exists; log out of Specio first",
+        "{} already exists; log out of Speq first",
         plist().display()
     );
 
@@ -71,7 +71,7 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
     api.with(|s| s.snapshot_ttl = 60); // inside the agent's refresh-ahead window, so the first tick must refresh
     let _cleanup = Cleanup(&api.url);
 
-    let login = specio(&api.url, &["login", "--no-browser"]);
+    let login = speq(&api.url, &["login", "--no-browser"]);
     assert!(
         login.status.success(),
         "login failed: {}",
@@ -81,7 +81,7 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
     // Installed: plist on disk pointing at this binary and API, and loaded into launchd.
     let text = std::fs::read_to_string(plist()).expect("plist written");
     assert!(
-        text.contains(env!("CARGO_BIN_EXE_specio"))
+        text.contains(env!("CARGO_BIN_EXE_speq"))
             && text.contains(&api.url)
             && text.contains("<string>agent</string>")
     );
@@ -89,7 +89,7 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
     assert!(printed.contains("run interval = 120 seconds"), "{printed}");
 
     // The real Keychain holds the credential: a later process can use it.
-    let list = specio(&api.url, &["list", "--json"]);
+    let list = speq(&api.url, &["list", "--json"]);
     assert!(
         list.status.success(),
         "{}",
@@ -115,7 +115,7 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
     });
 
     // Logout removes the credential, the cache, and the LaunchAgent.
-    let logout = specio(&api.url, &["logout"]);
+    let logout = speq(&api.url, &["logout"]);
     assert!(
         logout.status.success(),
         "{}",
@@ -127,5 +127,5 @@ fn launchd_agent_installs_refreshes_and_is_removed_on_logout() {
         Duration::from_secs(10),
         || launchctl_print().is_none(),
     );
-    assert_eq!(specio(&api.url, &["list"]).status.code(), Some(3));
+    assert_eq!(speq(&api.url, &["list"]).status.code(), Some(3));
 }

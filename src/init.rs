@@ -1,10 +1,10 @@
-//! `specio list` and `specio init`.
+//! `speq list` and `speq init`.
 use crate::api::ProjectSummary;
 use crate::env::Env;
 use crate::error::{Error, Result};
 use crate::paths::is_valid_local_dir;
 use crate::session::Session;
-use crate::workspace::{Config, SPECIO_DIR, SpecSource, Workspace, ensure_gitignore};
+use crate::workspace::{Config, SPEQ_DIR, SpecSource, Workspace, ensure_gitignore};
 use serde::Serialize;
 use std::path::Path;
 
@@ -56,7 +56,7 @@ pub fn resolve_repo<'a>(
     };
     match matches.as_slice() {
         [] => Err(Error::invalid(format!(
-            "{wanted:?} is not in your repository list; see `specio list`"
+            "{wanted:?} is not in your repository list; see `speq list`"
         ))),
         [(project, _)] => Ok(project),
         many => Err(Error::invalid(format!(
@@ -89,10 +89,10 @@ pub struct InitOptions<'a> {
 }
 
 pub async fn init(env: &Env, root: &Path, options: InitOptions<'_>) -> Result<InitReport> {
-    let existing = root.join(SPECIO_DIR).join("config.toml").exists();
+    let existing = root.join(SPEQ_DIR).join("config.toml").exists();
     if existing && !options.reconfigure {
         return Err(Error::invalid(
-            "this directory is already initialized; run `specio init <repo> --type <type> --reconfigure` to change it",
+            "this directory is already initialized; run `speq init <repo> --type <type> --reconfigure` to change it",
         ));
     }
     if !REPOSITORY_TYPES.contains(&options.repository_type) {

@@ -1,4 +1,4 @@
-# Releasing the Specio CLI
+# Releasing the Speq CLI
 
 Releases are automatic: one push to `main`, one commit, one workflow (`.github/workflows/release.yml`).
 
@@ -18,7 +18,7 @@ subjects this repository already requires (`<type>: <summary>`):
 The first releasable commit publishes `v0.1.0`. Merging with a squash commit? Make the squash subject carry the type.
 
 The checked-in `version` in `Cargo.toml` is only a placeholder: CI stamps the computed version into `Cargo.toml` and the
-`specio` entry of `Cargo.lock` before building (`scripts/stamp_version.py`, not committed), so `specio --version` and the
+`speq` entry of `Cargo.lock` before building (`scripts/stamp_version.py`, not committed), so `speq --version` and the
 manifest always show the released version. Local builds report the placeholder.
 
 Before merging to `main`: the PR is green (fmt, clippy, tests on macOS/Linux-musl/Windows, MSRV, `cargo deny`, gitleaks,
@@ -31,7 +31,7 @@ download anonymously). To suppress a release for a code change, use a non-releas
    tag already exists. Releases are serialised (`concurrency: release`) so two quick pushes never collide.
 2. **verify** — fmt, clippy, deny, installer lint.
 3. **build** (macOS ARM64, macOS Intel, Linux x86_64 musl, Windows x86_64 MSVC) — stamps the version, `cargo test`, release build
-   with `SPECIO_COMMIT=<sha>`, smoke test `specio --version` (checks version, commit, target), package.
+   with `SPEQ_COMMIT=<sha>`, smoke test `speq --version` (checks version, commit, target), package.
 4. **publish** — `SHA256SUMS`, `manifest.json`, rendered Homebrew/Scoop/WinGet files, `install.sh`, `install.ps1`; creates a
    **draft** release, uploads everything, then publishes (`--latest`). The tag is created at that last step on the built commit,
    so a failed build leaves no tag, and users never see a partial release.
@@ -44,25 +44,25 @@ Release assets (per version `V`, target `T`):
 
 | Asset | Purpose |
 | --- | --- |
-| `specio-V-T[.exe]` | bare binary: what the installers and `specio upgrade` download |
-| `specio-V-T.tar.gz` / `.zip` | archive for manual install and package managers |
+| `speq-V-T[.exe]` | bare binary: what the installers and `speq upgrade` download |
+| `speq-V-T.tar.gz` / `.zip` | archive for manual install and package managers |
 | `SHA256SUMS` | checksums of every file; the installers find the right line from it |
-| `manifest.json` | versioned manifest read by `specio upgrade` (version, commit, per-target URL/SHA-256/size) |
+| `manifest.json` | versioned manifest read by `speq upgrade` (version, commit, per-target URL/SHA-256/size) |
 | `install.sh`, `install.ps1` | installers |
-| `specio.rb`, `specio.scoop.json`, `Dayatech.Specio.yaml` | package-manager metadata with fixed-version URLs |
+| `speq.rb`, `speq.scoop.json`, `Dayatech.Speq.yaml` | package-manager metadata with fixed-version URLs |
 
 Signing: no release signing key exists yet, so integrity rests on HTTPS plus SHA-256. When a key exists, sign
 `manifest.json`, embed the public key in the binary, and verify in `upgrade` and both installers.
 
 ## After release
 
-* Homebrew: copy `specio.rb` into the tap repository (`brew install <tap>/specio`).
-* Scoop / WinGet: submit `specio.scoop.json` / `Dayatech.Specio.yaml` to the bucket or `microsoft/winget-pkgs`.
-* Pin/downgrade check: `specio upgrade --version <old> --yes`.
+* Homebrew: copy `speq.rb` into the tap repository (`brew install <tap>/speq`).
+* Scoop / WinGet: submit `speq.scoop.json` / `Dayatech.Speq.yaml` to the bucket or `microsoft/winget-pkgs`.
+* Pin/downgrade check: `speq upgrade --version <old> --yes`.
 
 ## Rollback
 
 Releases are immutable by convention. To withdraw a bad release: mark it as pre-release or delete it on GitHub
 (`latest` then points at the previous stable release; delete the tag too if the version number must be reused, otherwise the next
 `fix:` commit publishes a fixed patch version). Installed users move with
-`specio upgrade`; pinned users stay until they choose to move.
+`speq upgrade`; pinned users stay until they choose to move.

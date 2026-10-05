@@ -1,4 +1,4 @@
-//! Background refresh agent: a per-user job that runs `specio agent run` every two minutes.
+//! Background refresh agent: a per-user job that runs `speq agent run` every two minutes.
 //! macOS uses a launchd LaunchAgent, Linux a systemd user timer, Windows a per-user scheduled task.
 //! Each tick is a no-op until the capability snapshot is close to expiry.
 use crate::error::{Error, IoContext, Result};
@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 pub const INTERVAL_SECONDS: u32 = 120;
-const LABEL: &str = "com.dayatech.specio.agent";
-const SYSTEMD_UNIT: &str = "specio-agent";
-const WINDOWS_TASK: &str = "Specio Agent";
+const LABEL: &str = "com.dayatech.speq.agent";
+const SYSTEMD_UNIT: &str = "speq-agent";
+const WINDOWS_TASK: &str = "Speq Agent";
 
 pub trait Scheduler: Send + Sync {
     fn install(&self) -> Result<()>;
@@ -65,7 +65,7 @@ fn home() -> Result<PathBuf> {
 }
 
 fn current_exe() -> Result<PathBuf> {
-    std::env::current_exe().ctx("locate the specio executable")
+    std::env::current_exe().ctx("locate the speq executable")
 }
 
 // ------------------------------------------------------------- unit files
@@ -120,7 +120,7 @@ fn systemd_quote(arg: &str) -> String {
 
 pub fn systemd_service(exe: &Path, api_url: &str) -> String {
     format!(
-        "[Unit]\nDescription=Specio capability snapshot refresh\n\n[Service]\nType=oneshot\nExecStart={} --api-url {} agent run\n",
+        "[Unit]\nDescription=Speq capability snapshot refresh\n\n[Service]\nType=oneshot\nExecStart={} --api-url {} agent run\n",
         systemd_quote(&exe.to_string_lossy()),
         systemd_quote(api_url),
     )
@@ -128,7 +128,7 @@ pub fn systemd_service(exe: &Path, api_url: &str) -> String {
 
 pub fn systemd_timer() -> String {
     format!(
-        "[Unit]\nDescription=Specio capability snapshot refresh timer\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec={INTERVAL_SECONDS}\nRandomizedDelaySec=10\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+        "[Unit]\nDescription=Speq capability snapshot refresh timer\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec={INTERVAL_SECONDS}\nRandomizedDelaySec=10\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
     )
 }
 
@@ -253,26 +253,27 @@ mod tests {
 
     #[test]
     fn plist_escapes_and_lists_arguments() {
-        let plist = launchd_plist(Path::new("/Users/a&b/bin/specio"), "https://api.example");
-        assert!(plist.contains("<string>/Users/a&amp;b/bin/specio</string>"));
+        let plist = launchd_plist(Path::new("/Users/a&b/bin/speq"), "https://api.example");
+        assert!(plist.contains("<string>/Users/a&amp;b/bin/speq</string>"));
         assert!(plist.contains("<string>agent</string>") && plist.contains("<string>run</string>"));
         assert!(plist.contains(&format!("<integer>{INTERVAL_SECONDS}</integer>")));
     }
 
     #[test]
     fn systemd_quoting_prevents_expansion() {
-        let unit = systemd_service(Path::new("/home/a b/specio"), "https://api.example");
-        assert!(unit.contains(
-            "ExecStart=\"/home/a b/specio\" --api-url \"https://api.example\" agent run"
-        ));
+        let unit = systemd_service(Path::new("/home/a b/speq"), "https://api.example");
+        assert!(
+            unit.contains(
+                "ExecStart=\"/home/a b/speq\" --api-url \"https://api.example\" agent run"
+            )
+        );
         assert_eq!(systemd_quote("100%$x\"y"), "\"100%%$$x\\\"y\"");
         assert!(systemd_timer().contains("RandomizedDelaySec=10"));
     }
 
     #[test]
     fn schtasks_runs_every_two_minutes_for_the_current_user() {
-        let args =
-            schtasks_create_args(Path::new("C:\\Users\\a\\specio.exe"), "https://api.example");
+        let args = schtasks_create_args(Path::new("C:\\Users\\a\\speq.exe"), "https://api.example");
         assert!(args.windows(2).any(|w| w == ["/MO", "2"]));
         assert!(args.iter().any(|a| a.contains("agent run")));
         assert!(!args.contains(&"/RU".to_string()));

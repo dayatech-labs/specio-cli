@@ -1,8 +1,8 @@
 mod support;
 
-use specio::context::context;
-use specio::error::{Error, exit};
-use specio::sync::{push, status};
+use speq::context::context;
+use speq::error::{Error, exit};
+use speq::sync::{push, status};
 use support::{Fixture, PROJECT};
 
 const PRD: &str = "epics/epic-payment/prd.md";
@@ -231,7 +231,7 @@ async fn update_applies_one_file_only_when_local_is_unchanged() {
     f.api.external_change(PRD, Some("# PRD v2\n"));
     f.api.external_change(README, Some("# readme v2\n"));
 
-    let done = specio::sync::pull::update(&f.device.env, &f.ws(), PRD)
+    let done = speq::sync::pull::update(&f.device.env, &f.ws(), PRD)
         .await
         .unwrap();
     assert_eq!(done.result, "updated");
@@ -242,7 +242,7 @@ async fn update_applies_one_file_only_when_local_is_unchanged() {
         "other files are untouched"
     );
     assert_eq!(
-        specio::sync::pull::update(&f.device.env, &f.ws(), PRD)
+        speq::sync::pull::update(&f.device.env, &f.ws(), PRD)
             .await
             .unwrap()
             .result,
@@ -250,13 +250,13 @@ async fn update_applies_one_file_only_when_local_is_unchanged() {
     );
 
     f.write(README, "# my edit\n");
-    let err = specio::sync::pull::update(&f.device.env, &f.ws(), README)
+    let err = speq::sync::pull::update(&f.device.env, &f.ws(), README)
         .await
         .unwrap_err();
     assert!(matches!(err, Error::Conflict(_)));
     assert_eq!(f.read(README).as_deref(), Some("# my edit\n"));
     assert!(
-        specio::sync::pull::update(&f.device.env, &f.ws(), "../x.md")
+        speq::sync::pull::update(&f.device.env, &f.ws(), "../x.md")
             .await
             .is_err()
     );
@@ -311,7 +311,7 @@ async fn a_rejected_push_keeps_lock_and_files_and_is_not_retried() {
 
     let err = push::push(&f.device.env, &f.ws()).await.unwrap_err();
     assert!(matches!(err, Error::Conflict(_)));
-    assert!(err.to_string().contains("specio pull"));
+    assert!(err.to_string().contains("speq pull"));
     assert_eq!(
         f.api.count("POST /v1/projects/proj_payment/changes"),
         1,
@@ -433,7 +433,7 @@ async fn a_revoked_role_is_caught_by_the_api_even_while_the_snapshot_is_valid() 
             .retain(|p| p != PROJECT)
     });
     assert_eq!(
-        specio::init::list(&f.device.env)
+        speq::init::list(&f.device.env)
             .await
             .unwrap()
             .projects
@@ -454,20 +454,20 @@ async fn state_is_separated_per_workspace() {
     let f = Fixture::new().await;
     f.pull().await.unwrap();
     let other = tempfile::tempdir().unwrap();
-    let options = specio::init::InitOptions {
+    let options = speq::init::InitOptions {
         repo: "acme/cart-specs",
         repository_type: "backend",
         local_dir: "docs/specs",
         reconfigure: false,
     };
-    specio::init::init(
+    speq::init::init(
         &f.device.env,
         &std::fs::canonicalize(other.path()).unwrap(),
         options,
     )
     .await
     .unwrap();
-    let ws = specio::workspace::Workspace::discover(other.path()).unwrap();
+    let ws = speq::workspace::Workspace::discover(other.path()).unwrap();
     assert!(ws.load_lock().unwrap().head_sha.is_none());
     assert!(ws.load_manifest().unwrap().files.is_empty());
     assert_eq!(ws.config.spec_source.local_dir, "docs/specs");
@@ -491,7 +491,7 @@ trait ExitForTest {
 
 impl ExitForTest for status::StatusReport {
     fn exit_code_for_test(&self) -> u8 {
-        use specio::output::Human;
+        use speq::output::Human;
         self.exit_code()
     }
 }

@@ -62,13 +62,13 @@ class NextVersion(unittest.TestCase):
 class Stamp(unittest.TestCase):
     def test_stamps_cargo_toml_and_lock_together(self):
         d = pathlib.Path(tempfile.mkdtemp())
-        (d / "Cargo.toml").write_text('[package]\nname = "specio"\nversion = "0.0.0"\n\n[dependencies]\nclap = { version = "4.6.7" }\n')
-        (d / "Cargo.lock").write_text('[[package]]\nname = "clap"\nversion = "4.6.7"\n\n[[package]]\nname = "specio"\nversion = "0.0.0"\ndependencies = [\n "clap",\n]\n')
+        (d / "Cargo.toml").write_text('[package]\nname = "speq"\nversion = "0.0.0"\n\n[dependencies]\nclap = { version = "4.6.7" }\n')
+        (d / "Cargo.lock").write_text('[[package]]\nname = "clap"\nversion = "4.6.7"\n\n[[package]]\nname = "speq"\nversion = "0.0.0"\ndependencies = [\n "clap",\n]\n')
         subprocess.run([sys.executable, str(HERE / "stamp_version.py"), "2.5.1"], check=True, cwd=d)
         self.assertIn('version = "2.5.1"', (d / "Cargo.toml").read_text())
         self.assertIn('version = "4.6.7"', (d / "Cargo.toml").read_text())
         lock = (d / "Cargo.lock").read_text()
-        self.assertIn('name = "specio"\nversion = "2.5.1"', lock)
+        self.assertIn('name = "speq"\nversion = "2.5.1"', lock)
         self.assertIn('name = "clap"\nversion = "4.6.7"', lock)
         bad = subprocess.run([sys.executable, str(HERE / "stamp_version.py"), "1.2"], cwd=d)
         self.assertNotEqual(bad.returncode, 0)

@@ -12,10 +12,9 @@ pub struct AppDirs {
 
 impl AppDirs {
     pub fn discover() -> Result<AppDirs> {
-        let dirs =
-            directories::ProjectDirs::from("com", "dayatech", "specio").ok_or_else(|| {
-                Error::Other("cannot determine the application data directory".into())
-            })?;
+        let dirs = directories::ProjectDirs::from("com", "dayatech", "speq").ok_or_else(|| {
+            Error::Other("cannot determine the application data directory".into())
+        })?;
         Ok(AppDirs {
             root: dirs.data_local_dir().to_path_buf(),
         })

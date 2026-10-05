@@ -1742,7 +1742,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "specio"
+name = "speq"
 version = "0.1.0"
 dependencies = [
  "base64",

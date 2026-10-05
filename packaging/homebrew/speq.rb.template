@@ -1,6 +1,6 @@
-class Specio < Formula
+class Speq < Formula
   desc "Sync product specs into implementation repositories"
-  homepage "https://github.com/dayatech-labs/specio-cli"
+  homepage "https://github.com/dayatech-labs/speq-cli"
   version "@VERSION@"
 
   on_macos do
@@ -22,10 +22,10 @@ class Specio < Formula
   end
 
   def install
-    bin.install "specio"
+    bin.install "speq"
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/specio --version")
+    assert_match version.to_s, shell_output("#{bin}/speq --version")
   end
 end

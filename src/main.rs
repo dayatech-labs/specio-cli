@@ -1,6 +1,6 @@
-use specio::commands::{parse_args, run};
-use specio::env::Env;
-use specio::error::{Error, exit};
+use speq::commands::{parse_args, run};
+use speq::env::Env;
+use speq::error::{Error, exit};
 use std::process::ExitCode;
 use tracing_subscriber::EnvFilter;
 
@@ -19,16 +19,16 @@ fn main() -> ExitCode {
         // Clap prints help/version/usage errors itself and picks the exit code (0 or 2).
         Err(e) => e.exit(),
     };
-    // Logs go to stderr, at `warn` unless SPECIO_LOG says otherwise. Tokens and content are never logged.
+    // Logs go to stderr, at `warn` unless SPEQ_LOG says otherwise. Tokens and content are never logged.
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("SPECIO_LOG").unwrap_or_else(|_| EnvFilter::new("warn")),
+            EnvFilter::try_from_env("SPEQ_LOG").unwrap_or_else(|_| EnvFilter::new("warn")),
         )
         .with_writer(std::io::stderr)
         .init();
 
     let json = cli.json;
-    let open_browser = !matches!(&cli.command, specio::cli::Command::Login(a) if a.no_browser);
+    let open_browser = !matches!(&cli.command, speq::cli::Command::Login(a) if a.no_browser);
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

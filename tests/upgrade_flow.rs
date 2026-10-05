@@ -1,8 +1,8 @@
 use semver::Version;
-use specio::hashing::sha256_hex;
+use speq::hashing::sha256_hex;
 #[cfg(unix)]
-use specio::upgrade::Asset;
-use specio::upgrade::{self, Install};
+use speq::upgrade::Asset;
+use speq::upgrade::{self, Install};
 use std::collections::HashMap;
 
 #[path = "support/http.rs"]
@@ -40,7 +40,7 @@ fn manifest(base: &str, version: &str, binary: &[u8]) -> Vec<u8> {
         "version": version,
         "commit": "abc",
         "artifacts": { upgrade::CURRENT_TARGET: { "binary": {
-            "url": format!("{base}/bin/specio-{version}"), "sha256": sha256_hex(binary), "size": binary.len() } } }
+            "url": format!("{base}/bin/speq-{version}"), "sha256": sha256_hex(binary), "size": binary.len() } } }
     })
     .to_string()
     .into_bytes()
@@ -72,7 +72,7 @@ async fn network_failure_or_invalid_manifest_is_an_error_never_up_to_date() {
             .await
             .unwrap_err()
             .exit_code(),
-        specio::error::exit::UNAVAILABLE
+        speq::error::exit::UNAVAILABLE
     );
 
     let releases = Releases::start(HashMap::from([
@@ -93,7 +93,7 @@ async fn network_failure_or_invalid_manifest_is_an_error_never_up_to_date() {
 #[tokio::test]
 async fn install_verifies_then_replaces_atomically_and_keeps_the_old_binary_on_failure() {
     use std::os::unix::fs::PermissionsExt;
-    let new_binary = b"#!/bin/sh\necho \"specio 9.9.9\"\n".to_vec();
+    let new_binary = b"#!/bin/sh\necho \"speq 9.9.9\"\n".to_vec();
     let releases = Releases::start(HashMap::from([
         ("/bin/good".to_string(), new_binary.clone()),
         (
@@ -102,11 +102,11 @@ async fn install_verifies_then_replaces_atomically_and_keeps_the_old_binary_on_f
         ),
         (
             "/bin/liar".to_string(),
-            b"#!/bin/sh\necho \"specio 1.0.0\"\n".to_vec(),
+            b"#!/bin/sh\necho \"speq 1.0.0\"\n".to_vec(),
         ),
     ]));
     let dir = tempfile::tempdir().unwrap();
-    let exe = dir.path().join("specio");
+    let exe = dir.path().join("speq");
     std::fs::write(&exe, "old").unwrap();
     let http = upgrade::http_client().unwrap();
     let version = Version::parse("9.9.9").unwrap();
@@ -127,7 +127,7 @@ async fn install_verifies_then_replaces_atomically_and_keeps_the_old_binary_on_f
     assert_eq!(std::fs::read_to_string(&exe).unwrap(), "old");
 
     // Right checksum but the binary does not report the expected version.
-    let lying = asset("/bin/liar", b"#!/bin/sh\necho \"specio 1.0.0\"\n");
+    let lying = asset("/bin/liar", b"#!/bin/sh\necho \"speq 1.0.0\"\n");
     assert!(
         upgrade::install_binary(&http, &lying, &exe, &version)
             .await
@@ -164,9 +164,9 @@ async fn install_verifies_then_replaces_atomically_and_keeps_the_old_binary_on_f
 fn package_manager_binaries_are_never_replaced() {
     let official = std::path::Path::new("/home/a/.local/bin");
     for path in [
-        "/opt/homebrew/Cellar/specio/1.0.0/bin/specio",
-        "/home/linuxbrew/.linuxbrew/bin/specio",
-        "C:\\Users\\a\\scoop\\shims\\specio.exe",
+        "/opt/homebrew/Cellar/speq/1.0.0/bin/speq",
+        "/home/linuxbrew/.linuxbrew/bin/speq",
+        "C:\\Users\\a\\scoop\\shims\\speq.exe",
     ] {
         assert!(
             matches!(
@@ -177,10 +177,7 @@ fn package_manager_binaries_are_never_replaced() {
         );
     }
     assert_eq!(
-        upgrade::detect_install(
-            std::path::Path::new("/usr/local/bin/specio"),
-            Some(official)
-        ),
+        upgrade::detect_install(std::path::Path::new("/usr/local/bin/speq"), Some(official)),
         Install::Unmanaged
     );
 }

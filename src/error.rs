@@ -38,9 +38,9 @@ impl fmt::Display for ApiError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("not logged in; run `specio login`")]
+    #[error("not logged in; run `speq login`")]
     NotLoggedIn,
-    #[error("the session is no longer valid; run `specio login` again")]
+    #[error("the session is no longer valid; run `speq login` again")]
     SessionExpired,
     #[error("network error: {0}")]
     Network(String),
@@ -50,7 +50,7 @@ pub enum Error {
     Conflict(String),
     #[error("{0}")]
     Invalid(String),
-    #[error("not a Specio workspace (no .specio/config.toml found); run `specio init <repo>`")]
+    #[error("not a Speq workspace (no .speq/config.toml found); run `speq init <repo>`")]
     NotInitialized,
     #[error("{context}: {source}")]
     Io {

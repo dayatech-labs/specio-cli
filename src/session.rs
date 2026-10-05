@@ -89,7 +89,7 @@ fn device_name() -> String {
     let cleaned: String = raw.chars().filter(|c| !c.is_control()).collect();
     let cleaned = cleaned.trim();
     let name = if cleaned.is_empty() {
-        format!("specio on {}", std::env::consts::OS)
+        format!("speq on {}", std::env::consts::OS)
     } else {
         cleaned.to_string()
     };
@@ -187,7 +187,7 @@ impl<'a> Session<'a> {
             tokio::time::sleep(interval).await;
             if tokio::time::Instant::now() >= deadline {
                 return Err(Error::invalid(
-                    "the login request expired; run `specio login` again",
+                    "the login request expired; run `speq login` again",
                 ));
             }
             match self.env.client.cli_complete(request_id, verifier).await {
@@ -201,7 +201,7 @@ impl<'a> Session<'a> {
                     if matches!(e.status, 404 | 410) || e.code == "invalid_grant" =>
                 {
                     return Err(Error::invalid(
-                        "the login request is no longer valid; run `specio login` again",
+                        "the login request is no longer valid; run `speq login` again",
                     ));
                 }
                 Err(Error::Network(message)) => {
@@ -297,7 +297,7 @@ impl<'a> Session<'a> {
             // The token was already rejected server-side: nothing is left to end.
             Err(Error::SessionExpired) => Ok(report),
             Err(e) => Err(Error::Network(format!(
-                "signed out on this machine, but the other sessions could not be ended ({e}); log in and run `specio logout --all` to retry"
+                "signed out on this machine, but the other sessions could not be ended ({e}); log in and run `speq logout --all` to retry"
             ))),
         }
     }

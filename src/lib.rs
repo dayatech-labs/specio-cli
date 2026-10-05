@@ -1,4 +1,4 @@
-//! Specio CLI library: everything the `specio` binary does, testable without a terminal.
+//! Speq CLI library: everything the `speq` binary does, testable without a terminal.
 pub mod agent;
 pub mod api;
 pub mod cli;

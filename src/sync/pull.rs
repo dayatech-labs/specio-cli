@@ -1,4 +1,4 @@
-//! `specio pull` and `specio update`: apply the remote manifest without ever overwriting local work.
+//! `speq pull` and `speq update`: apply the remote manifest without ever overwriting local work.
 use super::plan::{Change, State, classify};
 use super::{PULL_ATTEMPTS, remote_shas, require_safe, settle};
 use crate::api::SyncManifest;
@@ -270,7 +270,7 @@ fn apply(
                         .ok_or_else(|| Error::Other(format!("{path} disappeared while pulling")))?;
                     if git_blob_sha(&bytes) != remote_paths[path] {
                         return Err(Error::Other(format!(
-                            "{path} changed while pulling; run `specio pull` again"
+                            "{path} changed while pulling; run `speq pull` again"
                         )));
                     }
                     ws.write_base(path, &bytes)?;
@@ -356,7 +356,7 @@ async fn update_inner(
         };
         if verdict.state == State::Conflict || verdict.local != Change::None && !verdict.converged {
             return Err(Error::conflict(format!(
-                "{path} has local changes; update refuses to overwrite them (see `specio diff {path}`)"
+                "{path} has local changes; update refuses to overwrite them (see `speq diff {path}`)"
             )));
         }
         if r.is_none() && b.is_none() && l.is_none() {

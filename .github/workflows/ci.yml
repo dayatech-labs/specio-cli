@@ -54,11 +54,11 @@ jobs:
       - name: Release manifest and packaging render from sample binaries
         run: |
           d=$(mktemp -d); v=9.9.9
-          for t in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl; do echo bin > "$d/specio-$v-$t"; echo a > "$d/specio-$v-$t.tar.gz"; done
-          echo bin > "$d/specio-$v-x86_64-pc-windows-msvc.exe"; echo a > "$d/specio-$v-x86_64-pc-windows-msvc.zip"
+          for t in aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl; do echo bin > "$d/speq-$v-$t"; echo a > "$d/speq-$v-$t.tar.gz"; done
+          echo bin > "$d/speq-$v-x86_64-pc-windows-msvc.exe"; echo a > "$d/speq-$v-x86_64-pc-windows-msvc.zip"
           python3 scripts/release_manifest.py "$d" $v 0123456789abcdef0123456789abcdef01234567 https://example.test/dl
           python3 scripts/render_packaging.py "$d" $v "$d/out"
-          grep -q 'class Specio' "$d/out/specio.rb"
+          grep -q 'class Speq' "$d/out/speq.rb"
           python3 -c "import json,sys; m=json.load(open('$d/manifest.json')); assert m['version']=='$v' and len(m['artifacts'])==4"
 
   supply-chain:

@@ -1,17 +1,17 @@
 <#
 .SYNOPSIS
-  Specio installer for Windows (x86_64).
+  Speq installer for Windows (x86_64).
 
 .EXAMPLE
-  irm https://github.com/dayatech-labs/specio-cli/releases/latest/download/install.ps1 | iex
+  irm https://github.com/dayatech-labs/speq-cli/releases/latest/download/install.ps1 | iex
 
 .EXAMPLE
-  & ([scriptblock]::Create((irm https://github.com/dayatech-labs/specio-cli/releases/latest/download/install.ps1))) -Version 1.4.0
+  & ([scriptblock]::Create((irm https://github.com/dayatech-labs/speq-cli/releases/latest/download/install.ps1))) -Version 1.4.0
 
 .DESCRIPTION
-  Installs specio.exe into %LOCALAPPDATA%\Specio\bin without administrator rights. The download is
+  Installs speq.exe into %LOCALAPPDATA%\Speq\bin without administrator rights. The download is
   verified against SHA256SUMS (fetched over HTTPS) before it is installed. The installer never asks
-  for credentials or workspace URLs; run `specio login` afterwards.
+  for credentials or workspace URLs; run `speq login` afterwards.
 #>
 [CmdletBinding()]
 param([string]$Version = "")
@@ -19,7 +19,7 @@ param([string]$Version = "")
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-$Releases = if ($env:SPECIO_RELEASE_URL) { $env:SPECIO_RELEASE_URL } else { "https://github.com/dayatech-labs/specio-cli/releases" }
+$Releases = if ($env:SPEQ_RELEASE_URL) { $env:SPEQ_RELEASE_URL } else { "https://github.com/dayatech-labs/speq-cli/releases" }
 if ($Releases -notmatch '^(https://|http://127\.0\.0\.1|http://localhost)') { throw "the release URL must use https" }
 
 $Version = $Version.TrimStart("v")
@@ -32,24 +32,24 @@ if ($arch -ne [System.Runtime.InteropServices.Architecture]::X64) {
 $target = "x86_64-pc-windows-msvc"
 
 $base = if ($Version) { "$Releases/download/v$Version" } else { "$Releases/latest/download" }
-$binDir = Join-Path $env:LOCALAPPDATA "Specio\bin"
+$binDir = Join-Path $env:LOCALAPPDATA "Speq\bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("specio-install-" + [guid]::NewGuid().ToString("N"))
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("speq-install-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmp | Out-Null
-$staged = Join-Path $binDir (".specio-install-" + [guid]::NewGuid().ToString("N") + ".exe")
+$staged = Join-Path $binDir (".speq-install-" + [guid]::NewGuid().ToString("N") + ".exe")
 
 try {
   Write-Host "Fetching the release manifest..."
   $sumsPath = Join-Path $tmp "SHA256SUMS"
   Invoke-WebRequest -UseBasicParsing -Uri "$base/SHA256SUMS" -OutFile $sumsPath
 
-  $line = Get-Content $sumsPath | Where-Object { $_ -match "^[0-9a-f]{64}\s+specio-[0-9][^\s]*-$target\.exe$" } | Select-Object -First 1
+  $line = Get-Content $sumsPath | Where-Object { $_ -match "^[0-9a-f]{64}\s+speq-[0-9][^\s]*-$target\.exe$" } | Select-Object -First 1
   if (-not $line) { throw "this release has no build for $target" }
   $expected, $name = $line -split '\s+', 2
-  $found = $name -replace "^specio-", "" -replace "-$target\.exe$", ""
+  $found = $name -replace "^speq-", "" -replace "-$target\.exe$", ""
   if ($Version -and $found -ne $Version) { throw "release mismatch: wanted $Version, found $found" }
 
-  Write-Host "Downloading specio $found for $target..."
+  Write-Host "Downloading speq $found for $target..."
   $download = Join-Path $tmp $name
   Invoke-WebRequest -UseBasicParsing -Uri "$Releases/download/v$found/$name" -OutFile $download
 
@@ -60,9 +60,9 @@ try {
   & $staged --version *> $null
   if ($LASTEXITCODE -ne 0) { throw "the downloaded binary does not run on this system; nothing was installed" }
 
-  $dest = Join-Path $binDir "specio.exe"
+  $dest = Join-Path $binDir "speq.exe"
   if (Test-Path $dest) {
-    # A running specio.exe cannot be overwritten, but it can be renamed away.
+    # A running speq.exe cannot be overwritten, but it can be renamed away.
     $old = "$dest.old"
     Remove-Item -Force -ErrorAction SilentlyContinue $old
     Move-Item -Force $dest $old
@@ -71,7 +71,7 @@ try {
   } else {
     Move-Item -Force $staged $dest
   }
-  Write-Host "Installed specio $found to $dest"
+  Write-Host "Installed speq $found to $dest"
 
   # User PATH: add once, never duplicate.
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -79,9 +79,9 @@ try {
   if ($entries -notcontains $binDir) {
     [Environment]::SetEnvironmentVariable("Path", (($entries + $binDir) -join ';'), "User")
     Write-Host ""
-    Write-Host "$binDir was added to your user PATH. Open a new terminal, then run: specio login"
+    Write-Host "$binDir was added to your user PATH. Open a new terminal, then run: speq login"
   } else {
-    Write-Host "Next: run ``specio login``."
+    Write-Host "Next: run ``speq login``."
   }
 } finally {
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tmp

@@ -133,7 +133,7 @@ pub async fn run(cli: Cli, env: &Env) -> Result<u8> {
 }
 
 async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8> {
-    let base = std::env::var("SPECIO_RELEASE_URL")
+    let base = std::env::var("SPEQ_RELEASE_URL")
         .unwrap_or_else(|_| upgrade::DEFAULT_RELEASE_BASE.to_string());
     let pinned = args
         .version
@@ -154,7 +154,7 @@ async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8
     }
 
     let exe = std::env::current_exe().map_err(|e| Error::Io {
-        context: "locate the specio executable".into(),
+        context: "locate the speq executable".into(),
         source: e,
     })?;
     let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
@@ -166,12 +166,12 @@ async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8
     match upgrade::detect_install(&exe, official.as_deref()) {
         Install::Managed { manager, command } => {
             return Err(Error::invalid(format!(
-                "specio is managed by {manager}; update it with `{command}` (nothing was changed)"
+                "speq is managed by {manager}; update it with `{command}` (nothing was changed)"
             )));
         }
         Install::Unmanaged => {
             return Err(Error::invalid(format!(
-                "{} was not installed by the official installer, so `specio upgrade` will not replace it; reinstall with the installer or your package manager",
+                "{} was not installed by the official installer, so `speq upgrade` will not replace it; reinstall with the installer or your package manager",
                 exe.display()
             )));
         }
@@ -202,7 +202,7 @@ async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8
         ));
     }
     let artifact = manifest.artifacts.get(upgrade::CURRENT_TARGET).ok_or_else(|| Error::invalid(format!("this release has no build for {}; download an archive manually from the release page", upgrade::CURRENT_TARGET)))?;
-    if !args.yes && !confirm(&format!("Install specio {target} (currently {current})?"))? {
+    if !args.yes && !confirm(&format!("Install speq {target} (currently {current})?"))? {
         return Err(Error::invalid("cancelled; nothing was changed"));
     }
     upgrade::install_binary(&http, &artifact.binary, &exe, &target).await?;

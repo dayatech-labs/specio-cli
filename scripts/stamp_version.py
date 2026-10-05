@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stamp the release version into Cargo.toml and the `specio` entry of Cargo.lock (CI only, not committed).
+"""Stamp the release version into Cargo.toml and the `speq` entry of Cargo.lock (CI only, not committed).
 
 The version comes from the commit history (scripts/next_version.py), so the checked-in 0.x value is only a
 placeholder. `cargo build --locked` stays valid because both files are changed together.
@@ -20,7 +20,7 @@ if count != 1:
 toml.write_text(text, encoding="utf-8")
 
 lock = pathlib.Path("Cargo.lock")
-text, count = re.subn(r'(\[\[package\]\]\nname = "specio"\nversion = )"[^"]*"', rf'\g<1>"{version}"', lock.read_text(encoding="utf-8"), count=1)
+text, count = re.subn(r'(\[\[package\]\]\nname = "speq"\nversion = )"[^"]*"', rf'\g<1>"{version}"', lock.read_text(encoding="utf-8"), count=1)
 if count != 1:
-    sys.exit("no specio entry in Cargo.lock")
+    sys.exit("no speq entry in Cargo.lock")
 lock.write_text(text, encoding="utf-8")

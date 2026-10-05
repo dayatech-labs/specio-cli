@@ -1,9 +1,9 @@
 mod support;
 
-use specio::credentials::CredentialStore;
-use specio::error::Error;
-use specio::session::{AgentOutcome, Session};
-use specio::snapshot;
+use speq::credentials::CredentialStore;
+use speq::error::Error;
+use speq::session::{AgentOutcome, Session};
+use speq::snapshot;
 use std::sync::atomic::Ordering;
 use support::{Device, FakeApi, REPO};
 
@@ -139,7 +139,7 @@ async fn list_uses_the_valid_snapshot_without_calling_the_api() {
     let device = Device::new(&api);
     device.login().await;
     let before = api.requests();
-    let list = specio::init::list(&device.env).await.unwrap();
+    let list = speq::init::list(&device.env).await.unwrap();
     assert_eq!(list.projects.len(), 3);
     assert_eq!(
         api.requests(),
@@ -162,7 +162,7 @@ async fn an_expired_snapshot_is_never_used_and_refreshes_with_if_none_match() {
     // The cache is expired, so `list` must refresh in the foreground instead of trusting it.
     api.with(|s| s.snapshot_ttl = 600);
     let before = api.requests();
-    let list = specio::init::list(&device.env).await.unwrap();
+    let list = speq::init::list(&device.env).await.unwrap();
     assert!(api.requests() > before);
     // The ETag still matched, so the new window came from a 304 and the content is unchanged.
     let after = snapshot::load(&device.env.snapshot_path())
@@ -184,7 +184,7 @@ async fn a_304_without_valid_window_headers_triggers_a_full_fetch() {
         s.send_304_headers = false;
     });
     let before = api.count("GET /v1/projects");
-    specio::init::list(&device.env).await.unwrap();
+    speq::init::list(&device.env).await.unwrap();
     assert_eq!(
         api.count("GET /v1/projects") - before,
         2,
@@ -224,10 +224,10 @@ async fn role_change_refreshes_the_snapshot_after_a_403() {
         "# CLI\n",
     );
     let before = f.api.count("GET /v1/projects");
-    let err = specio::sync::push::push(&f.device.env, &f.ws())
+    let err = speq::sync::push::push(&f.device.env, &f.ws())
         .await
         .unwrap_err();
-    assert_eq!(err.exit_code(), specio::error::exit::DENIED);
+    assert_eq!(err.exit_code(), speq::error::exit::DENIED);
     // The snapshot was dropped and refreshed once; the push itself was sent exactly once.
     assert_eq!(f.api.count("GET /v1/projects") - before, 1);
     assert_eq!(f.api.count("POST /v1/projects/proj_payment/changes"), 1);
@@ -272,7 +272,7 @@ async fn an_expired_token_is_dropped_locally_without_calling_the_api() {
     let before = api.requests();
     let err = Session::new(&device.env).authenticate().await.unwrap_err();
     assert!(matches!(err, Error::SessionExpired));
-    assert_eq!(err.exit_code(), specio::error::exit::AUTH);
+    assert_eq!(err.exit_code(), speq::error::exit::AUTH);
     assert_eq!(api.requests(), before, "there is no refresh to attempt");
     assert!(device.creds.load(&device.env.account()).unwrap().is_none());
     assert!(
@@ -368,10 +368,10 @@ async fn init_lists_only_repositories_from_the_api_and_requires_unique_short_nam
         let root = root.clone();
         let env = &f.device.env;
         async move {
-            specio::init::init(
+            speq::init::init(
                 env,
                 &root,
-                specio::init::InitOptions {
+                speq::init::InitOptions {
                     repo,
                     repository_type: "frontend",
                     local_dir: "specs",
@@ -395,13 +395,13 @@ async fn init_lists_only_repositories_from_the_api_and_requires_unique_short_nam
     let gitignore = std::fs::read_to_string(root.join(".gitignore")).unwrap();
     for line in [
         "specs/",
-        ".specio/lock.json",
-        ".specio/manifest.json",
-        ".specio/base/",
+        ".speq/lock.json",
+        ".speq/manifest.json",
+        ".speq/base/",
     ] {
         assert!(gitignore.lines().any(|l| l == line), "{line}");
     }
-    assert!(root.join(".specio/config.toml").is_file());
+    assert!(root.join(".speq/config.toml").is_file());
     assert!(root.join("specs").is_dir());
 
     // Re-init needs an explicit reconfigure.

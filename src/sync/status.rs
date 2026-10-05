@@ -1,4 +1,4 @@
-//! `specio status` and `specio diff`.
+//! `speq status` and `speq diff`.
 use super::plan::{State, classify};
 use super::{remote_shas, settle};
 use crate::env::Env;

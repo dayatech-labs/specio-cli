@@ -10,7 +10,7 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "packaging"
-RELEASE_URL = "https://github.com/dayatech-labs/specio-cli/releases/download"
+RELEASE_URL = "https://github.com/dayatech-labs/speq-cli/releases/download"
 
 
 def sums(directory: pathlib.Path) -> dict:
@@ -27,7 +27,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     def archive(target: str, ext: str) -> tuple:
-        name = f"specio-{version}-{target}.{ext}"
+        name = f"speq-{version}-{target}.{ext}"
         return f"{RELEASE_URL}/v{version}/{name}", table[name]
 
     values = {"VERSION": version}
@@ -41,9 +41,9 @@ def main() -> int:
         values[f"{key}_URL"], values[f"{key}_SHA256"] = url, digest
 
     for template, destination in [
-        (ROOT / "homebrew" / "specio.rb.template", out / "specio.rb"),
-        (ROOT / "windows" / "scoop.json.template", out / "specio.scoop.json"),
-        (ROOT / "windows" / "winget.yaml.template", out / "Dayatech.Specio.yaml"),
+        (ROOT / "homebrew" / "speq.rb.template", out / "speq.rb"),
+        (ROOT / "windows" / "scoop.json.template", out / "speq.scoop.json"),
+        (ROOT / "windows" / "winget.yaml.template", out / "Dayatech.Speq.yaml"),
     ]:
         text = template.read_text(encoding="utf-8")
         for key, value in values.items():

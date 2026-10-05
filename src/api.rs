@@ -1,4 +1,4 @@
-//! Typed client for the Specio API. It never logs tokens or document content.
+//! Typed client for the Speq API. It never logs tokens or document content.
 use crate::error::{ApiError, Error, Result};
 use reqwest::{Method, StatusCode};
 use secrecy::{ExposeSecret, SecretString};
@@ -8,7 +8,7 @@ use std::sync::Once;
 use std::time::Duration;
 use url::Url;
 
-pub const DEFAULT_API_URL: &str = "https://specio-api.dayatech.workers.dev";
+pub const DEFAULT_API_URL: &str = "https://speq-api.dayatech.workers.dev";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Reads are retried on 429/503 only, waiting at most this long per attempt.
@@ -229,7 +229,7 @@ impl Client {
     pub fn new(base: Url) -> Result<Client> {
         install_crypto_provider();
         let http = reqwest::Client::builder()
-            .user_agent(format!("specio-cli/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("speq-cli/{}", env!("CARGO_PKG_VERSION")))
             .timeout(REQUEST_TIMEOUT)
             .connect_timeout(CONNECT_TIMEOUT)
             // The API never redirects; following one could forward the Bearer token elsewhere.
@@ -390,8 +390,8 @@ impl Client {
         };
         if response.status() == StatusCode::NOT_MODIFIED {
             return Ok(ProjectsResponse::NotModified {
-                issued_at: header("x-specio-snapshot-issued-at"),
-                expires_at: header("x-specio-snapshot-expires-at"),
+                issued_at: header("x-speq-snapshot-issued-at"),
+                expires_at: header("x-speq-snapshot-expires-at"),
             });
         }
         let etag = header("etag");
@@ -445,9 +445,9 @@ fn describe_transport(e: &reqwest::Error) -> String {
     if e.is_timeout() {
         "the request timed out".into()
     } else if e.is_connect() {
-        "cannot connect to the Specio API".into()
+        "cannot connect to the Speq API".into()
     } else {
-        "the request to the Specio API failed".into()
+        "the request to the Speq API failed".into()
     }
 }
 
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn api_url_rules() {
-        assert!(parse_api_url("https://specio-api.dayatech.workers.dev").is_ok());
+        assert!(parse_api_url("https://speq-api.dayatech.workers.dev").is_ok());
         assert!(parse_api_url("http://localhost:8787").is_ok());
         assert!(parse_api_url("http://127.0.0.1:8787").is_ok());
         assert!(parse_api_url("http://example.com").is_err());

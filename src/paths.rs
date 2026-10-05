@@ -104,7 +104,7 @@ pub fn join_canonical(base: &Path, canonical: &str) -> PathBuf {
         .fold(base.to_path_buf(), |acc, segment| acc.join(segment))
 }
 
-/// `local_dir` must stay inside the workspace: relative, no `..`, no hidden or `.specio` segments.
+/// `local_dir` must stay inside the workspace: relative, no `..`, no hidden or `.speq` segments.
 pub fn is_valid_local_dir(dir: &str) -> bool {
     !dir.is_empty()
         && dir.len() <= 100
@@ -182,7 +182,7 @@ mod tests {
             "/abs",
             "../up",
             "a/../b",
-            ".specio",
+            ".speq",
             "docs/.hidden",
             "a\\b",
             "a//b",

@@ -72,7 +72,7 @@ jobs:
       run:
         shell: bash
     env:
-      SPECIO_COMMIT: ${{ github.sha }}
+      SPEQ_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
       - name: Stamp the release version (CI only, not committed)
@@ -91,9 +91,9 @@ jobs:
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Smoke test
         run: |
-          out=$(target/${{ matrix.target }}/release/specio${{ matrix.exe }} --version)
+          out=$(target/${{ matrix.target }}/release/speq${{ matrix.exe }} --version)
           echo "$out"
-          echo "$out" | grep -q "specio ${{ needs.plan.outputs.version }}"
+          echo "$out" | grep -q "speq ${{ needs.plan.outputs.version }}"
           echo "$out" | grep -q "commit: ${{ github.sha }}"
           echo "$out" | grep -q "target: ${{ matrix.target }}"
       - name: Package
@@ -101,13 +101,13 @@ jobs:
           version="${{ needs.plan.outputs.version }}"
           target="${{ matrix.target }}"
           mkdir -p dist stage
-          cp "target/$target/release/specio${{ matrix.exe }}" "dist/specio-$version-$target${{ matrix.exe }}"
-          cp "target/$target/release/specio${{ matrix.exe }}" "stage/specio${{ matrix.exe }}"
+          cp "target/$target/release/speq${{ matrix.exe }}" "dist/speq-$version-$target${{ matrix.exe }}"
+          cp "target/$target/release/speq${{ matrix.exe }}" "stage/speq${{ matrix.exe }}"
           cp README.md stage/
           if [ "${{ matrix.pack }}" = "zip" ]; then
-            (cd stage && 7z a -tzip "../dist/specio-$version-$target.zip" .)
+            (cd stage && 7z a -tzip "../dist/speq-$version-$target.zip" .)
           else
-            tar -czf "dist/specio-$version-$target.tar.gz" -C stage .
+            tar -czf "dist/speq-$version-$target.tar.gz" -C stage .
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -141,7 +141,7 @@ jobs:
         run: |
           tag="${{ needs.plan.outputs.tag }}"
           # The tag does not exist yet: publishing the release creates it on the built commit.
-          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "specio $tag" --generate-notes
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "speq $tag" --generate-notes
           gh release upload "$tag" dist/* --clobber
           gh release edit "$tag" --draft=false --latest
 
@@ -157,9 +157,9 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           curl --proto '=https' --tlsv1.2 -fsSL "https://github.com/${{ github.repository }}/releases/download/v${{ needs.plan.outputs.version }}/install.sh" | sh -s -- --version "${{ needs.plan.outputs.version }}"
-          "$HOME/.local/bin/specio" --version
-          "$HOME/.local/bin/specio" help > /dev/null
-          "$HOME/.local/bin/specio" upgrade --check
+          "$HOME/.local/bin/speq" --version
+          "$HOME/.local/bin/speq" help > /dev/null
+          "$HOME/.local/bin/speq" upgrade --check
       - name: Install the published release (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -167,7 +167,7 @@ jobs:
           $v = "${{ needs.plan.outputs.version }}"
           $script = Invoke-RestMethod "https://github.com/${{ github.repository }}/releases/download/v$v/install.ps1"
           & ([scriptblock]::Create($script)) -Version $v
-          $exe = Join-Path $env:LOCALAPPDATA "Specio\bin\specio.exe"
+          $exe = Join-Path $env:LOCALAPPDATA "Speq\bin\speq.exe"
           & $exe --version
           & $exe help | Out-Null
           & $exe upgrade --check

@@ -1,7 +1,7 @@
 {
   "version": "@VERSION@",
   "description": "Sync product specs into implementation repositories",
-  "homepage": "https://github.com/dayatech-labs/specio-cli",
+  "homepage": "https://github.com/dayatech-labs/speq-cli",
   "license": "Proprietary",
   "architecture": {
     "64bit": {
@@ -9,12 +9,12 @@
       "hash": "@WINDOWS_SHA256@"
     }
   },
-  "bin": "specio.exe",
-  "checkver": { "github": "https://github.com/dayatech-labs/specio-cli" },
+  "bin": "speq.exe",
+  "checkver": { "github": "https://github.com/dayatech-labs/speq-cli" },
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/dayatech-labs/specio-cli/releases/download/v$version/specio-$version-x86_64-pc-windows-msvc.zip"
+        "url": "https://github.com/dayatech-labs/speq-cli/releases/download/v$version/speq-$version-x86_64-pc-windows-msvc.zip"
       }
     }
   }

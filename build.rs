@@ -1,8 +1,8 @@
-//! Embeds the commit SHA and build target so `specio --version` can report them.
+//! Embeds the commit SHA and build target so `speq --version` can report them.
 use std::process::Command;
 
 fn main() {
-    let commit = std::env::var("SPECIO_COMMIT")
+    let commit = std::env::var("SPEQ_COMMIT")
         .ok()
         .filter(|s| !s.is_empty())
         .or_else(|| {
@@ -15,8 +15,8 @@ fn main() {
         })
         .unwrap_or_else(|| "unknown".to_string());
     let target = std::env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
-    println!("cargo:rustc-env=SPECIO_COMMIT={commit}");
-    println!("cargo:rustc-env=SPECIO_TARGET={target}");
-    println!("cargo:rerun-if-env-changed=SPECIO_COMMIT");
+    println!("cargo:rustc-env=SPEQ_COMMIT={commit}");
+    println!("cargo:rustc-env=SPEQ_TARGET={target}");
+    println!("cargo:rerun-if-env-changed=SPEQ_COMMIT");
     println!("cargo:rerun-if-changed=.git/HEAD");
 }

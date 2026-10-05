@@ -1,4 +1,4 @@
-//! The workspace: `.specio/` metadata (config, lock, manifest, baseline copies) and the
+//! The workspace: `.speq/` metadata (config, lock, manifest, baseline copies) and the
 //! `specs/` working copy, with safe path handling and atomic writes throughout.
 use crate::env::Env;
 use crate::error::{Error, IoContext, Result};
@@ -68,13 +68,13 @@ pub struct Workspace {
     pub config: Config,
 }
 
-pub const SPECIO_DIR: &str = ".specio";
+pub const SPEQ_DIR: &str = ".speq";
 
 impl Workspace {
     pub fn discover(start: &Path) -> Result<Workspace> {
         let start = fs::canonicalize(start).ctx(format!("resolve {}", start.display()))?;
         for dir in start.ancestors() {
-            if dir.join(SPECIO_DIR).join("config.toml").is_file() {
+            if dir.join(SPEQ_DIR).join("config.toml").is_file() {
                 return Workspace::open(dir);
             }
         }
@@ -82,7 +82,7 @@ impl Workspace {
     }
 
     pub fn open(root: &Path) -> Result<Workspace> {
-        let path = root.join(SPECIO_DIR).join("config.toml");
+        let path = root.join(SPEQ_DIR).join("config.toml");
         let raw = fs::read_to_string(&path).ctx(format!("read {}", path.display()))?;
         let config: Config = toml::from_str(&raw)
             .map_err(|e| Error::invalid(format!("{} is invalid: {e}", path.display())))?;
@@ -100,7 +100,7 @@ impl Workspace {
     }
 
     pub fn create(root: &Path, config: &Config) -> Result<Workspace> {
-        let dir = root.join(SPECIO_DIR);
+        let dir = root.join(SPEQ_DIR);
         let raw = toml::to_string_pretty(config).map_err(|e| Error::Other(e.to_string()))?;
         fsx::atomic_write(&dir.join("config.toml"), raw.as_bytes(), Visibility::Shared)?;
         let ws = Workspace {
@@ -111,8 +111,8 @@ impl Workspace {
         Ok(ws)
     }
 
-    pub fn specio_dir(&self) -> PathBuf {
-        self.root.join(SPECIO_DIR)
+    pub fn speq_dir(&self) -> PathBuf {
+        self.root.join(SPEQ_DIR)
     }
     pub fn project_id(&self) -> &str {
         &self.config.spec_source.project_id
@@ -125,19 +125,27 @@ impl Workspace {
             .fold(self.root.clone(), |acc, s| acc.join(s))
     }
     fn lock_path(&self) -> PathBuf {
-        self.specio_dir().join("lock.json")
+        self.speq_dir().join("lock.json")
     }
     fn manifest_path(&self) -> PathBuf {
-        self.specio_dir().join("manifest.json")
+        self.speq_dir().join("manifest.json")
     }
     pub fn base_dir(&self) -> PathBuf {
-        self.specio_dir().join("base")
+        self.speq_dir().join("base")
     }
 
     /// Serialise CLI processes working on this workspace; fails after a short grace when another one is running.
     pub fn guard(&self, env: &Env, shared: bool) -> Result<FileLock> {
-        FileLock::try_acquire_within(&env.dirs.workspace_lock(&self.root), shared, std::time::Duration::from_secs(1))?
-            .ok_or_else(|| Error::conflict("another specio command is already running in this workspace; wait for it to finish"))
+        FileLock::try_acquire_within(
+            &env.dirs.workspace_lock(&self.root),
+            shared,
+            std::time::Duration::from_secs(1),
+        )?
+        .ok_or_else(|| {
+            Error::conflict(
+                "another speq command is already running in this workspace; wait for it to finish",
+            )
+        })
     }
 
     // ------------------------------------------------------------ metadata
@@ -147,7 +155,7 @@ impl Workspace {
             None => Ok(T::default()),
             Some(bytes) => serde_json::from_slice(&bytes).map_err(|e| {
                 Error::invalid(format!(
-                    "{} is corrupt ({e}); remove it and run `specio pull`",
+                    "{} is corrupt ({e}); remove it and run `speq pull`",
                     path.display()
                 ))
             }),
@@ -340,9 +348,9 @@ fn walk(dir: &Path, prefix: &str, scan: &mut LocalScan) -> Result<()> {
 pub fn gitignore_entries(local_dir: &str) -> [String; 4] {
     [
         format!("{local_dir}/"),
-        ".specio/lock.json".into(),
-        ".specio/manifest.json".into(),
-        ".specio/base/".into(),
+        ".speq/lock.json".into(),
+        ".speq/manifest.json".into(),
+        ".speq/base/".into(),
     ]
 }
 
@@ -367,7 +375,7 @@ pub fn ensure_gitignore(root: &Path, local_dir: &str) -> Result<()> {
     if !updated.is_empty() {
         updated.push('\n');
     }
-    updated.push_str("# Specio\n");
+    updated.push_str("# Speq\n");
     for entry in missing {
         updated.push_str(&entry);
         updated.push('\n');
