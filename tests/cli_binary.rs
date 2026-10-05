@@ -13,9 +13,19 @@ fn speq(args: &[&str]) -> (i32, String, String) {
     )
 }
 
-const COMMANDS: [&str; 11] = [
-    "login", "logout", "list", "init", "pull", "status", "diff", "update", "push", "context",
+const COMMANDS: [&str; 12] = [
+    "login",
+    "logout",
+    "list",
+    "init",
+    "pull",
+    "status",
+    "diff",
+    "update",
+    "push",
+    "context",
     "upgrade",
+    "uninstall",
 ];
 
 #[test]
@@ -105,4 +115,13 @@ fn upgrade_check_fails_non_zero_when_the_release_server_is_unreachable() {
         .output()
         .expect("run");
     assert_eq!(out.status.code(), Some(4));
+}
+
+#[test]
+fn uninstall_without_a_terminal_asks_for_yes_and_changes_nothing() {
+    // Refuses before touching anything: with no terminal there is nobody to confirm.
+    let (code, _, err) = speq(&["uninstall"]);
+    assert_eq!(code, 7);
+    assert!(err.contains("--yes"), "{err}");
+    assert!(std::path::Path::new(env!("CARGO_BIN_EXE_speq")).exists());
 }

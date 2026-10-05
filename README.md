@@ -55,6 +55,21 @@ keeps the old binary. It only replaces binaries the official installer put in th
 is managed by Homebrew, Scoop, WinGet, or Nix it stops and prints the package manager's own command
 (`brew upgrade speq`, `scoop update speq`, ...). It never runs on its own during `login`, `pull`, or any other command.
 
+### Uninstall
+
+```bash
+speq logout --all    # optional: also end this account's sessions on the server and in the Web app
+speq uninstall       # asks for confirmation on a terminal
+speq uninstall --yes # for automation
+```
+
+`uninstall` removes the stored credential, the cache, and the background agent, then the binary itself if the
+official installer put it there. If `speq` is managed by Homebrew, Scoop, WinGet, or Nix, the binary is left alone
+and the package manager's own command is printed (`brew uninstall speq`, `scoop uninstall speq`, ...). It never
+touches your workspaces (`specs/` and `.speq/`), does not end the server-side session (use `logout --all` first), and
+only removes the credential of the API origin in use (`--api-url` / `SPEQ_API_URL`). The installer's PATH line in your
+shell profile (Unix) or the user PATH entry (Windows) is left for you to remove; the command points it out.
+
 ## Quick start
 
 ```bash
@@ -85,6 +100,7 @@ Add `--json` to any command for machine-readable output (errors are JSON on stde
 | `push` | send local changes as one batch; refused while the workspace has conflicts |
 | `context <epic>/<feature>` | deterministic list of context files, from the local copy |
 | `upgrade` | check for / install a newer `speq` binary |
+| `uninstall` | remove local data and, for an official install, the binary |
 
 ### How sync stays safe
 
@@ -151,6 +167,7 @@ specs/                   the working copy (ignored by Git)
 | `429`/rate-limited (exit 4) | reads are retried automatically a few times; wait a minute and retry |
 | `another speq command is already running in this workspace` | wait for it to finish; it is a per-workspace lock |
 | `upgrade` says it was "not installed by the official installer" | reinstall with the installer, or use your package manager |
+| `uninstall` reports the credential "could not be fully removed" | the OS credential store was unreachable; delete the `speq` entry there by hand (the token expires on its own) |
 
 ## Development
 

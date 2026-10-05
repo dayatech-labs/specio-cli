@@ -171,7 +171,10 @@ pub enum Install {
     /// Owned by a package manager: leave it alone and print its command.
     Managed {
         manager: &'static str,
+        /// Updates speq.
         command: &'static str,
+        /// Removes speq.
+        uninstall: &'static str,
     },
     /// Anywhere else (a build tree, `/usr/local/bin`, ...): not ours to overwrite.
     Unmanaged,
@@ -187,27 +190,53 @@ pub fn official_dir(home: Option<&Path>, local_app_data: Option<&Path>) -> Optio
 
 pub fn detect_install(exe: &Path, official: Option<&Path>) -> Install {
     let path = exe.to_string_lossy().replace('\\', "/").to_lowercase();
+    const BREW: (&str, &str, &str) = ("Homebrew", "brew upgrade speq", "brew uninstall speq");
+    const WINGET: (&str, &str, &str) = (
+        "WinGet",
+        "winget upgrade Dayatech.Speq",
+        "winget uninstall Dayatech.Speq",
+    );
     let managed = [
-        ("/cellar/", "Homebrew", "brew upgrade speq"),
-        ("/homebrew/", "Homebrew", "brew upgrade speq"),
-        ("/linuxbrew/", "Homebrew", "brew upgrade speq"),
-        ("/scoop/", "Scoop", "scoop update speq"),
-        ("/winget/", "WinGet", "winget upgrade Dayatech.Speq"),
+        ("/cellar/", BREW),
+        ("/homebrew/", BREW),
+        ("/linuxbrew/", BREW),
         (
-            "/microsoft/windowsapps/",
-            "WinGet",
-            "winget upgrade Dayatech.Speq",
+            "/scoop/",
+            ("Scoop", "scoop update speq", "scoop uninstall speq"),
         ),
-        ("/nix/store/", "Nix", "nix profile upgrade speq"),
+        ("/winget/", WINGET),
+        ("/microsoft/windowsapps/", WINGET),
+        (
+            "/nix/store/",
+            ("Nix", "nix profile upgrade speq", "nix profile remove speq"),
+        ),
     ];
-    if let Some((_, manager, command)) = managed.iter().find(|(marker, _, _)| path.contains(marker))
+    if let Some((_, (manager, command, uninstall))) =
+        managed.iter().find(|(marker, _)| path.contains(marker))
     {
-        return Install::Managed { manager, command };
+        return Install::Managed {
+            manager,
+            command,
+            uninstall,
+        };
     }
     match (exe.parent(), official) {
         (Some(parent), Some(dir)) if parent == dir => Install::Official,
         _ => Install::Unmanaged,
     }
+}
+
+/// The running executable (symlinks resolved) and who owns it.
+pub fn current_install() -> Result<(PathBuf, Install)> {
+    let exe = std::env::current_exe().ctx("locate the speq executable")?;
+    let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
+    let dirs = directories::BaseDirs::new();
+    let official = official_dir(
+        dirs.as_ref().map(|d| d.home_dir()),
+        dirs.as_ref().map(|d| d.data_local_dir()),
+    );
+    let install = detect_install(&exe, official.as_deref());
+    Ok((exe, install))
 }
 
 /// Download, verify (size and SHA-256), smoke-test, then atomically replace `exe`.

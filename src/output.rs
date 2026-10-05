@@ -6,6 +6,7 @@ use crate::session::{LoginReport, LogoutReport};
 use crate::sync::pull::{PullReport, UpdateReport};
 use crate::sync::push::PushReport;
 use crate::sync::status::{DiffReport, StatusReport};
+use crate::uninstall::UninstallReport;
 use crate::upgrade::{CheckReport, UpgradeReport};
 use serde::Serialize;
 
@@ -64,6 +65,24 @@ impl Human for LogoutReport {
         } else {
             "You were not logged in; local state was cleaned.".into()
         }
+    }
+}
+
+impl Human for UninstallReport {
+    fn human(&self) -> String {
+        let mut out = String::from(if self.credential_removed {
+            "Removed your local credentials, cached data, and the background agent."
+        } else {
+            "Removed your cached data and the background agent."
+        });
+        out.push_str("\nWorkspaces (specs/ and .speq/) were left untouched.");
+        if let Some(binary) = &self.removed_binary {
+            out.push_str(&format!("\nRemoved {binary}."));
+        }
+        for step in &self.manual_steps {
+            out.push_str(&format!("\n- {step}"));
+        }
+        out
     }
 }
 

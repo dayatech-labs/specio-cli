@@ -113,6 +113,12 @@ pub enum Command {
     )]
     Upgrade(UpgradeArgs),
 
+    /// Remove speq's local data and, when the installer put it there, the binary
+    #[command(
+        after_help = "Examples:\n  speq uninstall\n  speq uninstall --yes\n\nRemoves the stored credential, the cache, and the background agent, then the binary if it was placed by the\nofficial installer. Binaries managed by Homebrew, Scoop, WinGet, or another package manager are left in place and\nthe matching package-manager command is shown. Workspaces (`specs/` and `.speq/`) are never touched, and the\nserver-side session is not ended: run `speq logout --all` first for that. Only the credential of the current API\norigin is removed.\n\n"
+    )]
+    Uninstall(UninstallArgs),
+
     /// Background snapshot refresh (run by the OS scheduler)
     #[command(hide = true)]
     Agent(AgentArgs),
@@ -132,6 +138,7 @@ impl Command {
             Command::Push => "push",
             Command::Context(_) => "context",
             Command::Upgrade(_) => "upgrade",
+            Command::Uninstall(_) => "uninstall",
             Command::Agent(_) => "agent",
         }
     }
@@ -198,6 +205,13 @@ pub struct UpgradeArgs {
     /// Install this exact version (also allows downgrades)
     #[arg(long, value_name = "VERSION")]
     pub version: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct UninstallArgs {
+    /// Do not ask for confirmation
+    #[arg(long, short = 'y')]
+    pub yes: bool,
 }
 
 #[derive(Args, Debug)]

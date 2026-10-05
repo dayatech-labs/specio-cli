@@ -7,6 +7,7 @@ use crate::init::{self, InitOptions};
 use crate::output::emit;
 use crate::session::{AgentOutcome, Session};
 use crate::sync::{pull, push, status};
+use crate::uninstall;
 use crate::upgrade::{self, Install};
 use crate::workspace::Workspace;
 use clap::{CommandFactory, FromArgMatches};
@@ -119,6 +120,7 @@ pub async fn run(cli: Cli, env: &Env) -> Result<u8> {
         Command::Push => Ok(emit(json, &push::push(env, &workspace()?).await?)),
         Command::Context(args) => Ok(emit(json, &context::context(&workspace()?, &args.target)?)),
         Command::Upgrade(args) => upgrade_command(json, args).await,
+        Command::Uninstall(args) => uninstall_command(json, env, args),
         Command::Agent(args) => match args.action {
             AgentAction::Run => {
                 match Session::new(env).agent_tick(true).await? {
@@ -153,18 +155,11 @@ async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8
         return Ok(emit(json, &report));
     }
 
-    let exe = std::env::current_exe().map_err(|e| Error::Io {
-        context: "locate the speq executable".into(),
-        source: e,
-    })?;
-    let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
-    let dirs = directories::BaseDirs::new();
-    let official = upgrade::official_dir(
-        dirs.as_ref().map(|d| d.home_dir()),
-        dirs.as_ref().map(|d| d.data_local_dir()),
-    );
-    match upgrade::detect_install(&exe, official.as_deref()) {
-        Install::Managed { manager, command } => {
+    let (exe, install) = upgrade::current_install()?;
+    match install {
+        Install::Managed {
+            manager, command, ..
+        } => {
             return Err(Error::invalid(format!(
                 "speq is managed by {manager}; update it with `{command}` (nothing was changed)"
             )));
@@ -215,4 +210,21 @@ async fn upgrade_command(json: bool, args: crate::cli::UpgradeArgs) -> Result<u8
             path: Some(exe.display().to_string()),
         },
     ))
+}
+
+fn uninstall_command(json: bool, env: &Env, args: crate::cli::UninstallArgs) -> Result<u8> {
+    let (exe, install) = upgrade::current_install()?;
+    if !args.yes {
+        let binary = match install {
+            Install::Official => format!(" and {}", exe.display()),
+            _ => String::new(),
+        };
+        let prompt = format!(
+            "Uninstall speq? This removes your local credentials, cached data, and the background agent{binary}"
+        );
+        if !confirm(&prompt)? {
+            return Err(Error::invalid("cancelled; nothing was changed"));
+        }
+    }
+    Ok(emit(json, &uninstall::uninstall(env, &exe, &install)?))
 }
