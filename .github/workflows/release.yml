@@ -109,7 +109,7 @@ jobs:
           else
             tar -czf "dist/speq-$version-$target.tar.gz" -C stage .
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.target }}
           path: dist/*
